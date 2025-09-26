@@ -5,6 +5,11 @@
 **Status**: Draft  
 **Input**: User description: "I want a web app that allows users to login to the site, and then create a character that persists over subsequent logins. The user can select a name and character archetype. I already have an Entra ID external identities tenant setup for oauth with an app registration and userflow."
 
+## Clarifications
+
+### Session 2025-09-25
+- Q: When identity login succeeds but the character service is unavailable, what should the experience be? → A: Allow shell UI with banner and disabled character actions.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### Primary User Story
@@ -19,6 +24,7 @@ As a visitor returning to the TileMUD web experience, I can sign in with the org
 - How should the system respond if the identity provider login succeeds but the character service is temporarily unavailable?
 - What happens when a user submits a character without selecting an archetype or leaves the name field empty?
 - How should the system behave if the user’s identity identifier changes on the identity provider side?
+- When the character service is unavailable after login, the UI must load the shell, display a prominent banner about the outage, and disable character creation or selection until recovery.
 
 ### Success Metrics
 - 95% of authenticated sessions must display the user’s existing character roster within 2 seconds on a standard broadband connection.
@@ -36,6 +42,7 @@ As a visitor returning to the TileMUD web experience, I can sign in with the org
 - **FR-007**: System MUST allow each player account to create and manage multiple distinct character profiles and surface a way to choose which character to use after authentication.
 - **FR-008**: System MUST treat character creation choices as permanent, preventing post-creation edits or deletions of name and archetype.
 - **FR-009**: System MUST initialize and periodically refresh the available archetype catalog by requesting it from the game server so players always see the developer-managed roster.
+- **FR-010**: System MUST degrade gracefully when the character service is unavailable by loading the shell UI, surfacing a banner explaining the outage, and disabling character actions until the service is healthy.
 
 ### Key Entities
 - **Player Account**: Represents an authenticated individual sourced from the Entra ID external identities tenant; stores the external identity identifier and links to zero or more character profiles.
