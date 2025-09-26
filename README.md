@@ -29,6 +29,10 @@ Review the plan and other content and adjust as needed either by editing the mar
 Review the tasks list and edit as needed. Now you can proceed with using a coding agent to actually implement the tasks. Prompt the LLM to implement the tasks and "allow" commands as needed to proceed through development. Occassionally, you may need to run ```/tasks``` again to update progress.
 
     ```
+    Start implementing the tasks by following the plan.
+    ```
+
+    ```
     /tasks Update the tasks list to reflect completed tasks
     ```
 

@@ -92,7 +92,7 @@ As an authenticated user, I want to explicitly end my session so that my account
 - **FR-009**: System MUST purge or render inaccessible sensitive cached user-specific data after logout, including: character roster data, character selection, user profile attributes, personalization/preferences tied to identity, and any feature-flag evaluations that were user-specific. [NEEDS CLARIFICATION: confirm if analytics identifiers are included]
 - **FR-010**: System MUST NOT rehydrate authenticated UI components after logout due to late-arriving asynchronous responses (must discard stale authenticated responses).
 - **FR-011**: System MUST reflect logout state across concurrently open application views (e.g., other tabs) proactively in real-time (no user interaction required). [NEEDS CLARIFICATION: numeric propagation latency target]
-- **FR-012**: System SHOULD log a structured logout event containing minimally: user identifier surrogate, timestamp, and reason (manual, timeout, forced). [NEEDS CLARIFICATION: logging policy compliance requirements]
+- **FR-012**: System SHOULD log a structured logout event containing minimally: user identifier surrogate, timestamp, and reason (manual, timeout, forced).
 - **FR-013**: System MUST support graceful handling when network is unavailable during logout: local session artifacts cleared and user presented as signed out.
 - **FR-014**: System SHOULD provide accessibility-compliant semantics for the logout control (focusable, screen-reader label).
 - **FR-015**: System MUST prevent unauthorized re-entry via cached protected pages (e.g., require fresh authorization on attempted navigation after logout).
