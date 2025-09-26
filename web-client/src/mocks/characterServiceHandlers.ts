@@ -168,9 +168,9 @@ export const characterServiceHandlers = [
       return HttpResponse.json(outageNotice, { status: 503 });
     }
 
-    // Check for authentication header (unless explicitly bypassed)
+    // Check for authentication header (unless explicitly bypassed or in dev mode)
     const authHeader = request.headers.get('authorization');
-    if (!authHeader && scenario !== 'no-auth-bypass') {
+    if (!authHeader && scenario !== 'no-auth-bypass' && import.meta.env.PROD) {
       return HttpResponse.json(
         {
           service: 'character-service',
@@ -234,9 +234,9 @@ export const characterServiceHandlers = [
       return HttpResponse.json(outageNotice, { status: 503 });
     }
 
-    // Check for authentication header (unless explicitly bypassed)
+    // Check for authentication header (unless explicitly bypassed or in dev mode)
     const authHeader = request.headers.get('authorization');
-    if (!authHeader && scenario !== 'no-auth-bypass') {
+    if (!authHeader && scenario !== 'no-auth-bypass' && import.meta.env.PROD) {
       return HttpResponse.json(
         {
           service: 'character-service',
@@ -378,8 +378,8 @@ export const characterServiceHandlers = [
     return HttpResponse.json(newCharacter, { status: 201 });
   }),
 
-  // POST /api/players/me/characters/{characterId}/select
-  http.post('http://localhost:8080/api/players/me/characters/:characterId/select', async ({ request, params }) => {
+  // POST /api/players/me/characters/:characterId/select
+  http.post('*/api/players/me/characters/:characterId/select', async ({ request, params }) => {
     const { characterId } = params;
     const scenario = request.headers.get('x-mock-scenario');
     
@@ -392,9 +392,9 @@ export const characterServiceHandlers = [
       return HttpResponse.json(outageNotice, { status: 503 });
     }
 
-    // Check for authentication header (unless explicitly bypassed)
+    // Check for authentication header (unless explicitly bypassed or in dev mode)
     const authHeader = request.headers.get('authorization');
-    if (!authHeader && scenario !== 'no-auth-bypass') {
+    if (!authHeader && scenario !== 'no-auth-bypass' && import.meta.env.PROD) {
       return HttpResponse.json(
         {
           service: 'character-service',
@@ -496,10 +496,10 @@ export const characterServiceHandlers = [
   }),
 
   // Handle empty character ID in path
-  http.post('http://localhost:8080/api/players/me/characters//select', async ({ request }) => {
-    // Check for authentication header
+  http.post('*/api/players/me/characters//select', async ({ request }) => {
+    // Check for authentication header (dev mode bypass)
     const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
+    if (!authHeader && import.meta.env.PROD) {
       return HttpResponse.json(
         {
           service: 'character-service',
@@ -521,7 +521,7 @@ export const characterServiceHandlers = [
   }),
 
   // GET /api/service-health/character
-  http.get('http://localhost:8080/api/service-health/character', async ({ request }) => {
+  http.get('*/api/service-health/character', async ({ request }) => {
     const scenario = request.headers.get('x-mock-scenario');
     
     // Handle different health status scenarios

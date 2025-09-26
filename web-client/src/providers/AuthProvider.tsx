@@ -105,9 +105,9 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const msalConfig: Configuration = {
   auth: {
     clientId: import.meta.env.VITE_AZURE_CLIENT_ID,
-    authority: `https://${import.meta.env.VITE_AZURE_TENANT_ID}.b2clogin.com/${import.meta.env.VITE_AZURE_TENANT_ID}.onmicrosoft.com/${import.meta.env.VITE_AZURE_POLICY}`,
-    knownAuthorities: [`${import.meta.env.VITE_AZURE_TENANT_ID}.b2clogin.com`],
-    redirectUri: '/',
+    authority: import.meta.env.VITE_AZURE_AUTHORITY,
+    knownAuthorities: [new URL(import.meta.env.VITE_AZURE_AUTHORITY).hostname],
+    redirectUri: import.meta.env.VITE_AZURE_REDIRECT_URI || '/',
     postLogoutRedirectUri: '/',
     navigateToLoginRequestUrl: false,
   },
