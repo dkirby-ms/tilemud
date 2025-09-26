@@ -31,62 +31,42 @@ interface DiagnosticsOverlayProps {
   className?: string;
 }
 
-interface FPSCounter {
-  fps: number;
-  frameTime: number;
-  frameCount: number;
-  lastTime: number;
-}
-
 /**
  * Hook for FPS monitoring
  */
 const useFPSMonitor = () => {
-  const [fpsData, setFpsData] = useState<FPSCounter>({
-    fps: 0,
-    frameTime: 0,
-    frameCount: 0,
-    lastTime: performance.now(),
-  });
-
-  const animationId = useRef<number | undefined>(undefined);
-  const frameDataRef = useRef<FPSCounter>(fpsData);
-
-  const updateFPS = useCallback(() => {
-    const now = performance.now();
-    const current = frameDataRef.current;
+  const [fps, setFps] = useState<number>(0);
+  
+  useEffect(() => {
+    // Simple FPS counter without complex state management
+    let frameCount = 0;
+    let lastTime = performance.now();
+    let animationId: number;
     
-    current.frameCount++;
-    const elapsed = now - current.lastTime;
-    
-    if (elapsed >= 1000) { // Update every second
-      const fps = Math.round((current.frameCount * 1000) / elapsed);
-      const frameTime = elapsed / current.frameCount;
+    const tick = () => {
+      frameCount++;
+      const now = performance.now();
+      const elapsed = now - lastTime;
       
-      const newData = {
-        fps,
-        frameTime: Math.round(frameTime * 100) / 100,
-        frameCount: 0,
-        lastTime: now,
-      };
+      // Update FPS every 2 seconds to reduce state updates
+      if (elapsed >= 2000) {
+        const currentFps = Math.round((frameCount * 1000) / elapsed);
+        setFps(currentFps);
+        frameCount = 0;
+        lastTime = now;
+      }
       
-      frameDataRef.current = newData;
-      setFpsData(newData);
-    }
+      animationId = requestAnimationFrame(tick);
+    };
     
-    animationId.current = requestAnimationFrame(updateFPS);
+    animationId = requestAnimationFrame(tick);
+    
+    return () => {
+      cancelAnimationFrame(animationId);
+    };
   }, []);
 
-  useEffect(() => {
-    animationId.current = requestAnimationFrame(updateFPS);
-    return () => {
-      if (animationId.current) {
-        cancelAnimationFrame(animationId.current);
-      }
-    };
-  }, [updateFPS]);
-
-  return { fps: fpsData.fps, frameTime: fpsData.frameTime };
+  return { fps, frameTime: fps > 0 ? Math.round(1000 / fps) : 0 };
 };
 
 /**
@@ -94,35 +74,33 @@ const useFPSMonitor = () => {
  */
 const useLatencyMonitor = () => {
   const [latency, setLatency] = useState<number>(0);
-  const intervalRef = useRef<number | undefined>(undefined);
-
-  const measureLatency = useCallback(async () => {
-    const start = performance.now();
-    try {
-      // Use a lightweight endpoint or create a ping endpoint
-      await fetch('/api/service-health/character', { 
-        method: 'HEAD',
-        cache: 'no-cache'
-      });
-      const end = performance.now();
-      setLatency(Math.round(end - start));
-    } catch {
-      // If fetch fails, we can't measure latency
-      setLatency(-1);
-    }
-  }, []);
 
   useEffect(() => {
-    // Measure latency every 5 seconds
+    let timeoutId: number;
+    
+    const measureLatency = async () => {
+      try {
+        const start = performance.now();
+        await fetch('/api/service-health/character', { 
+          method: 'HEAD',
+          cache: 'no-cache'
+        });
+        const end = performance.now();
+        setLatency(Math.round(end - start));
+      } catch {
+        setLatency(-1);
+      }
+      
+      // Schedule next measurement
+      timeoutId = window.setTimeout(measureLatency, 10000); // Every 10 seconds
+    };
+
     measureLatency();
-    intervalRef.current = window.setInterval(measureLatency, 5000);
     
     return () => {
-      if (intervalRef.current) {
-        window.clearInterval(intervalRef.current);
-      }
+      window.clearTimeout(timeoutId);
     };
-  }, [measureLatency]);
+  }, []);
 
   return latency;
 };

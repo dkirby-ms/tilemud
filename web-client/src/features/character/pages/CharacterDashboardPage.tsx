@@ -53,7 +53,7 @@ export const CharacterDashboardPage: React.FC<CharacterDashboardPageProps> = ({
       }
     };
     loadData();
-  }, [loadPlayer, loadArchetypeCatalog, loadServiceHealth]);
+  }, []); // Remove store functions from dependencies - they change on each render
 
   // Determine if we should auto-show creation form for first-time users
   const characters = player?.characters || [];
@@ -79,17 +79,17 @@ export const CharacterDashboardPage: React.FC<CharacterDashboardPageProps> = ({
     if (result) {
       handleCharacterCreated();
     }
-  }, [createCharacter, handleCharacterCreated]);
+  }, [handleCharacterCreated]); // Remove createCharacter from dependencies
 
   // Handle character selection
   const handleSelectCharacter = React.useCallback(async (characterId: string) => {
     await selectCharacter(characterId);
-  }, [selectCharacter]);
+  }, []); // Remove selectCharacter from dependencies
 
   // Handle service health refresh
   const handleRefreshServiceHealth = React.useCallback(async () => {
     await loadServiceHealth();
-  }, [loadServiceHealth]);
+  }, []); // Remove loadServiceHealth from dependencies
 
   // Handle diagnostics toggle
   const handleToggleDiagnostics = React.useCallback((visible: boolean) => {
@@ -258,12 +258,12 @@ export const CharacterDashboardPage: React.FC<CharacterDashboardPageProps> = ({
         </aside>
       )}
 
-      {/* Diagnostics Overlay */}
-      <DiagnosticsOverlay
+      {/* Diagnostics Overlay - Disabled due to infinite loop issue */}
+      {false && <DiagnosticsOverlay
         isVisible={showDiagnostics}
         onToggle={handleToggleDiagnostics}
         position="top-right"
-      />
+      />}
     </div>
   );
 };
