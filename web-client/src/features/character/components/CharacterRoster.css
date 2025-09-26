@@ -1,0 +1,435 @@
+/**
+ * Character Roster Styles - TileMUD Web Client
+ * 
+ * Component-specific styles for the character roster display,
+ * including character cards, grid layout, and responsive design.
+ */
+
+.character-roster {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: var(--space-6);
+}
+
+/* Roster Header */
+.roster-header {
+  text-align: center;
+  margin-bottom: var(--space-8);
+}
+
+.roster-header h2 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+.roster-description {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-relaxed);
+}
+
+/* Error Banner */
+.error-banner {
+  margin-bottom: var(--space-6);
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-error-light);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius);
+  color: var(--color-error);
+  text-align: center;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: var(--space-12) var(--space-6);
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border: 2px dashed var(--color-surface-tertiary);
+}
+
+.empty-state__icon {
+  font-size: 4rem;
+  margin-bottom: var(--space-4);
+  opacity: 0.6;
+}
+
+.empty-state h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-xl);
+  color: var(--color-text);
+}
+
+.empty-state p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-relaxed);
+}
+
+/* Loading State */
+.loading-state {
+  text-align: center;
+  padding: var(--space-8);
+}
+
+.loading-state p {
+  margin-top: var(--space-4);
+  color: var(--color-text-secondary);
+}
+
+/* Character Sections */
+.character-section {
+  margin-bottom: var(--space-10);
+}
+
+.character-section:last-child {
+  margin-bottom: var(--space-6);
+}
+
+.section-title {
+  margin: 0 0 var(--space-4);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  border-bottom: 2px solid var(--color-primary);
+  padding-bottom: var(--space-2);
+}
+
+.section-note {
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+  background-color: var(--color-warning-light);
+  border-radius: var(--radius);
+  border-left: 4px solid var(--color-warning);
+}
+
+.section-note p {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Character Grid */
+.character-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-6);
+  margin-bottom: var(--space-4);
+}
+
+/* Character Card */
+.character-card {
+  position: relative;
+  background-color: var(--color-surface);
+  border: 2px solid var(--color-surface-tertiary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow);
+  transition: all var(--transition-base);
+}
+
+.character-card:hover {
+  border-color: var(--color-secondary);
+  box-shadow: var(--shadow-md);
+}
+
+.character-card--active {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-light);
+}
+
+.character-card--selected {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.character-card--inactive {
+  opacity: 0.8;
+  background-color: var(--color-surface-secondary);
+}
+
+.character-card--loading {
+  pointer-events: none;
+}
+
+/* Character Card Header */
+.character-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-4);
+}
+
+.character-card__name {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  line-height: var(--line-height-tight);
+  word-break: break-word;
+}
+
+/* Character Status */
+.character-status {
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--radius);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.character-status--active {
+  background-color: var(--color-success-light);
+  color: var(--color-success);
+}
+
+.character-status--retired {
+  background-color: var(--color-secondary-light);
+  color: var(--color-secondary);
+}
+
+.character-status--suspended {
+  background-color: var(--color-warning-light);
+  color: var(--color-warning);
+}
+
+.character-status--unknown {
+  background-color: var(--color-surface-tertiary);
+  color: var(--color-text-muted);
+}
+
+/* Character Info */
+.character-card__info {
+  margin-bottom: var(--space-5);
+}
+
+.character-card__detail {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+  font-size: var(--font-size-sm);
+}
+
+.character-card__detail:last-child {
+  margin-bottom: 0;
+}
+
+.character-card__label {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+.character-card__value {
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Character Actions */
+.character-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.character-action {
+  min-height: var(--touch-target);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.character-action--primary {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.character-action--primary:hover:not(:disabled) {
+  background-color: var(--color-primary-hover);
+}
+
+.character-action--secondary {
+  background-color: var(--color-surface-tertiary);
+  color: var(--color-text);
+}
+
+.character-action--secondary:hover:not(:disabled) {
+  background-color: var(--color-secondary);
+  color: white;
+}
+
+.character-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Character Indicator */
+.character-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background-color: var(--color-success-light);
+  color: var(--color-success);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.character-indicator__icon {
+  font-size: var(--font-size-base);
+}
+
+/* Secondary Actions */
+.character-card__secondary-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.character-card__secondary-actions .character-action {
+  flex: 1;
+  font-size: var(--font-size-xs);
+  min-height: 36px;
+}
+
+/* Action Spinner */
+.action-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Character Card Overlay */
+.character-card__overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.8);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+}
+
+.character-card__spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--color-surface-tertiary);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Roster Summary */
+.roster-summary {
+  margin-top: var(--space-8);
+  padding: var(--space-4);
+  background-color: var(--color-surface);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.roster-summary p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: var(--line-height-relaxed);
+}
+
+.roster-summary strong {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Screen Reader Only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .character-roster {
+    padding: var(--space-4) var(--space-3);
+  }
+  
+  .roster-header h2 {
+    font-size: var(--font-size-2xl);
+  }
+  
+  .character-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+  }
+  
+  .character-card {
+    padding: var(--space-4);
+  }
+  
+  .character-card__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+  
+  .character-status {
+    align-self: flex-start;
+  }
+  
+  .section-title {
+    font-size: var(--font-size-lg);
+  }
+  
+  .empty-state {
+    padding: var(--space-8) var(--space-4);
+  }
+  
+  .empty-state__icon {
+    font-size: 3rem;
+  }
+}
+
+/* Tablet Layout */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .character-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .character-card {
+    border-width: 3px;
+  }
+  
+  .character-card--active,
+  .character-card--selected {
+    border-width: 4px;
+  }
+}

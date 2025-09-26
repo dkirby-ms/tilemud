@@ -190,12 +190,9 @@ export abstract class AppErrorClass extends Error {
   toApiError(): ApiError {
     const apiError: ApiError = {
       service: this.service,
-      message: this.message
+      message: this.message,
+      retryAfterSeconds: this.retryAfterSeconds
     };
-    
-    if (this.retryAfterSeconds !== undefined) {
-      apiError.retryAfterSeconds = this.retryAfterSeconds;
-    }
     
     return apiError;
   }
