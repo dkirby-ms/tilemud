@@ -1,0 +1,206 @@
+openapi: 3.1.0
+info:
+  title: TileMUD Character Service (MVP)
+  version: 0.1.0
+  description: >-
+    Contract for retrieving archetypes, managing player characters, and selecting
+    the active character. Designed for thin-client integrations that rely on
+    server authoritative state. All error responses include problem+json bodies.
+servers:
+  - url: https://api.tilemud.example.com
+paths:
+  /api/catalog/archetypes:
+    get:
+      summary: List available archetypes
+      tags: [Catalog]
+      responses:
+        '200':
+          description: Catalog retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArchetypeCatalogResponse'
+        '503':
+          description: Catalog temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutageNotice'
+  /api/players/me/characters:
+    get:
+      summary: Retrieve the authenticated player's roster
+      tags: [Character]
+      responses:
+        '200':
+          description: Roster returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CharacterRosterResponse'
+        '401':
+          description: Authentication required
+        '503':
+          description: Character service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutageNotice'
+    post:
+      summary: Create a new character
+      tags: [Character]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCharacterRequest'
+      responses:
+        '201':
+          description: Character created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Character'
+        '400':
+          description: Validation failure (name formatting, archetype availability)
+        '409':
+          description: Name collision or character limit reached
+        '423':
+          description: Character creation locked due to permanent choice policy
+        '503':
+          description: Character service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutageNotice'
+  /api/players/me/characters/{characterId}/select:
+    post:
+      summary: Select an active character for the current session
+      tags: [Character]
+      parameters:
+        - name: characterId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Character selection acknowledged
+        '400':
+          description: Character selection invalid (retired or unavailable)
+        '404':
+          description: Character not found for player
+        '503':
+          description: Character service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutageNotice'
+  /api/service-health/character:
+    get:
+      summary: Report character service health for proactive UI banners
+      tags: [Health]
+      responses:
+        '200':
+          description: Health status payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceHealthResponse'
+components:
+  schemas:
+    CharacterRosterResponse:
+      type: object
+      required: [playerId, activeCharacterId, characters]
+      properties:
+        playerId:
+          type: string
+        activeCharacterId:
+          type: string
+          nullable: true
+        characters:
+          type: array
+          items:
+            $ref: '#/components/schemas/Character'
+        outage:
+          $ref: '#/components/schemas/OutageNotice'
+          nullable: true
+    Character:
+      type: object
+      required: [id, name, archetypeId, createdAt, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          pattern: '^[A-Z][a-z]+$'
+        archetypeId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [active, retired]
+    CreateCharacterRequest:
+      type: object
+      required: [name, archetypeId]
+      properties:
+        name:
+          type: string
+          pattern: '^[A-Z][a-z]+$'
+        archetypeId:
+          type: string
+    ArchetypeCatalogResponse:
+      type: object
+      required: [version, archetypes]
+      properties:
+        version:
+          type: string
+          description: Semantic version of the catalog to detect changes.
+        archetypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Archetype'
+    Archetype:
+      type: object
+      required: [id, name, isAvailable]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        isAvailable:
+          type: boolean
+        lastUpdatedAt:
+          type: string
+          format: date-time
+    OutageNotice:
+      type: object
+      required: [service, message]
+      properties:
+        service:
+          type: string
+          enum: [character-service]
+        message:
+          type: string
+        retryAfterSeconds:
+          type: integer
+          minimum: 0
+          nullable: true
+    ServiceHealthResponse:
+      type: object
+      required: [service, status]
+      properties:
+        service:
+          type: string
+          enum: [character-service]
+        status:
+          type: string
+          enum: [healthy, degraded, unavailable]
+        outage:
+          $ref: '#/components/schemas/OutageNotice'
+          nullable: true
