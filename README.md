@@ -3,7 +3,7 @@
 Minimal README for the tilemud project.
 
 ## Overview
-Tilemud is a small project that implements tile-based logic and related tooling. This repository uses spec-kit for writing specifications and the `specify` runner to execute them.
+Tilemud is a small project that implements tile-based logic and related tooling. This repository uses spec-kit and takes a specification-first agentic development approach with GitHub Copilot
 
 
 ## Specification-driven development
