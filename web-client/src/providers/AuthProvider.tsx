@@ -28,6 +28,7 @@ import type {
   RedirectRequest,
   EndSessionRequest
 } from '@azure/msal-browser';
+import { useLogoutListener } from '../hooks/useLogoutListener';
 
 /**
  * User profile information extracted from authentication claims
@@ -213,6 +214,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+
+  // Set up cross-tab logout listener
+  useLogoutListener();
 
   /**
    * Initialize authentication system

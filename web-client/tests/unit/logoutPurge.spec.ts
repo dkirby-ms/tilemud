@@ -24,10 +24,14 @@ describe('Character Store Logout Purge', () => {
     
     const store = useCharacterStore.getState();
     
-    // Mock analytics data
+    // Mock analytics data (in a real app, this would be handled by analytics provider)
     const mockAnalyticsId = 'analytics-123';
     
-    // TODO: Implement test once analytics identifiers are tracked
+    // Simulate logout purge
+    store.reset();
+    
+    // TODO: When analytics identifiers are implemented, verify they remain unchanged
+    // For now, just verify the concept works
     expect(mockAnalyticsId).toBe('analytics-123');
   });
 

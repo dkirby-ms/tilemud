@@ -52,15 +52,19 @@ This guide provides manual and automated test flows to validate the logout featu
 - On logout, a dev-only console log with `eventType: 'logout'` appears; can be asserted in tests.
 
 ## Integration Test Mapping
-| Scenario | Test Type | Notes |
-|----------|-----------|-------|
-| Standard logout | Integration | Assert redirect + purge |
-| Unsaved changes guard | Integration | Simulate focused dirty field |
-| Multi-tab propagation | (Optional) Integration | Use jsdom + storage event simulation |
-| Offline logout | Unit/Integration | Force offline flag |
-| Back navigation | Integration | Simulate history back after purge |
-| Idempotent double click | Unit | Rapidly invoke handler |
-| Event emission shape | Unit | Validate object fields |
+| Scenario | Test Type | Test File | Notes |
+|----------|-----------|-----------|-------|
+| Standard logout | Integration | `tests/integration/logout.standard.spec.ts` | Assert redirect + purge |
+| Unsaved changes guard | Integration | `tests/integration/logout.unsaved.spec.ts` | Simulate focused dirty field |
+| Multi-tab propagation | Unit + Integration | `tests/unit/logoutListener.spec.ts` + cross-tab test | Use jsdom + storage event simulation |
+| Offline logout | Integration | `tests/integration/logout.offline.spec.ts` | Force offline flag |
+| Back navigation | Integration | `tests/integration/logout.backnav.spec.ts` | Simulate history back after purge |
+| Idempotent double click | Unit | `tests/unit/logoutIdempotent.spec.ts` | Rapidly invoke handler |
+| Event emission shape | Unit | `tests/unit/logoutEvent.spec.ts` | Validate object fields |
+| localStorage broadcast | Unit | `tests/unit/logoutBroadcast.spec.ts` | Spy on localStorage.setItem |
+| Cross-tab listener | Unit | `tests/unit/logoutListener.spec.ts` | Storage event handling |
+| Focused dirty guard | Unit | `tests/unit/focusedDirtyGuard.spec.ts` | Form element dirty detection |
+| Character store purge | Unit | `tests/unit/logoutPurge.spec.ts` | Store reset behavior |
 
 ## Failure Recovery
 - If logout error surfaces, user already appears logged out (fail-secure). Re-login path tested by standard auth flows.

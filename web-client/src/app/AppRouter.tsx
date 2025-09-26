@@ -12,6 +12,7 @@ import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, RequireAuth, useAuth } from '../providers/AuthProvider';
 import { CharacterDashboardPage } from '../features/character/pages/CharacterDashboardPage';
+import { LogoutButton } from '../features/auth/LogoutButton';
 import { initializeCharacterClient } from '../features/character/api/characterClient';
 
 /**
@@ -73,7 +74,8 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <h1>TileMUD</h1>
           {user && (
             <div className="user-info">
-              Welcome, {user.displayName}
+              <span>Welcome, {user.displayName}</span>
+              <LogoutButton className="logout-button" />
             </div>
           )}
         </div>
