@@ -52,6 +52,18 @@ When creating this spec from a user prompt:
 
 ---
 
+## Clarifications
+### Session 2025-09-26
+- Q: What exact scope of server-side session/token invalidation is required when the user logs out (to satisfy the “global” wording)? → A: End this session now; mark other sessions to terminate lazily on their next request.
+- Q: What user-facing confirmation (if any) should appear immediately after a successful logout (beyond redirect) to signal completion? → A: No explicit message; just show public landing.
+- Q: How should unsaved changes detection decide to show the logout confirmation warning? → A: Any focused field with a non-empty value differing from its initial value.
+- Q: What minimum accessibility expectation should apply to the logout control for this feature’s acceptance (beyond generic WCAG conformance language)? → A: Keyboard focusable + aria-label if icon-only.
+- Q: What is the required handling for analytics/telemetry identifiers at logout (considering they’re currently excluded from purge)? → A: Keep identifiers unchanged across logout (session boundary only).
+
+> Applied: Updated FR-02 (lazy global invalidation), FR-04 (no success banner/page), FR-08 (focused dirty field heuristic), FR-09 (explicitly retain analytics identifiers unchanged across logout), FR-15 (explicit keyboard focus + aria-label if icon-only). Summary and edge cases adjusted for consistency.
+
+---
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### Primary User Story
@@ -68,52 +80,56 @@ As an authenticated user, I want to explicitly end my session so that my account
 8. **Given** an authenticated user, **When** logout is initiated during an ongoing background request, **Then** subsequent responses do not re-establish authenticated state or leak data.
 9. **Given** an authenticated user, **When** logout completes, **Then** any locally cached sensitive data (e.g., character roster, profile) is purged or rendered inaccessible. Clear any user-specific data related to the app.
 10. **Given** an authenticated user, **When** they return using the browser back button after logout, **Then** protected pages are not rendered with stale authenticated data.
+11. **Given** the user logs out on Device A while still signed in on Device B, **When** the next authenticated request is made from Device B, **Then** that request is rejected and Device B transitions to logged-out state (lazy global invalidation).
+12. **Given** an authenticated user logs out, **When** analytics identifiers are inspected post-logout, **Then** they remain unchanged and persist into any future login session boundary (no rotation at logout).
 
 ### Edge Cases
 - User initiates logout while offline (no network) → Clear local session
-- Logout initiated in one browser/device should invalidate sessions on others. 
+- Logout initiated in one browser/device should invalidate other device sessions lazily on next interaction (no proactive push)
 - Very short-lived sessions: user logs out immediately after logging in (ensure no race conditions).
 - Browser back/forward cache shows protected page after logout (must force revalidation strategy).
 - Simultaneous auto-timeout and manual logout trigger at same time (ensure consistent resulting state and single user-visible message).
 - User clicks logout while a modal/overlay is open (consistent handling required).
-- Accessibility: logout control must be reachable via keyboard and announced properly to assistive tech.
+- Accessibility: logout control must be keyboard focusable; if icon-only it exposes an aria-label conveying "Logout".
 - Auditing/compliance requirements for logout events desired.
+- Analytics identifier retention confirmed (no rotation at logout) — potential future enhancement flagged outside this scope.
+
 ## Requirements *(mandatory)*
 
 ### Functional Requirements (Finalized)
 The following represent the minimal, confirmed scope for the logout feature (no unresolved clarifications remain):
 
 - **FR-01**: Provide a clearly labeled, consistently placed logout action visible to authenticated users.
-- **FR-02**: Terminate the user's active authentication session globally (all devices/browsers) upon confirmed logout so no other active instance remains authorized.
+- **FR-02**: Terminate the current session immediately and mark all other active sessions/tokens for the user so that any subsequent request they make is rejected (lazy global invalidation; no proactive push to other devices).
 - **FR-03**: Remove or invalidate all client-held authentication/session artifacts: access/refresh tokens, session identifiers, user-scoped cached API responses (character roster, profile, personalization state), in-memory state store data, and any local/session storage or IndexedDB entries containing user-identifiable session data.
-- **FR-04**: Redirect the user to the public root path `/` immediately after successful logout.
+- **FR-04**: Redirect the user to the public root path `/` immediately after successful logout with no additional success banner or dedicated signed-out page; the presence of public landing/sign-in controls is sufficient confirmation.
 - **FR-05**: Prevent post-logout access to protected resources, including via back/forward navigation; no protected or sensitive content may render even momentarily (no stale DOM flash).
 - **FR-06**: Handle logout idempotently—repeated triggers produce a single final logged-out state without error or duplicate messaging.
 - **FR-07**: Show a visible progress indicator (spinner or status text) only if logout completion exceeds 400ms; otherwise remain silent.
-- **FR-08**: Warn users about unsaved in-progress changes (if any form field value differs from its initial state or user is beyond step 1 of a multi-step flow) before completing logout; provide Confirm / Cancel. (No auto-save.)
-- **FR-09**: Purge or render inaccessible sensitive cached user-specific data after logout: character roster, character selection, user profile attributes, personalization/preferences tied to identity, user-specific feature flag evaluations, last selected character ID, and session-derived preferences. Non-identifying UI theme preference may persist. Analytics / generic telemetry identifiers are excluded from purge.
+- **FR-08**: Present an unsaved-changes confirmation dialog only if the currently focused form field has a non-empty value that differs from its initial value (single-field dirty focused heuristic); otherwise proceed directly.
+- **FR-09**: Purge or render inaccessible sensitive cached user-specific data after logout: character roster, character selection, user profile attributes, personalization/preferences tied to identity, user-specific feature flag evaluations, last selected character ID, and session-derived preferences. Non-identifying UI theme preference may persist. Analytics / generic telemetry identifiers are retained unchanged across logout (no rotation) and excluded from purge.
 - **FR-10**: Discard late-arriving asynchronous responses initiated prior to logout to prevent rehydrating authenticated UI state.
 - **FR-11**: Reflect logout across other open application tabs/windows upon their next user interaction (focus, navigation, protected request); proactive real-time push is not required.
 - **FR-12**: Support offline or network-failure logout by clearing client artifacts and presenting the user as signed out (fail-safe local termination).
 - **FR-13**: Halt or abort background polling immediately on logout; ignore or discard any late results.
 - **FR-14**: Avoid exposing internal error details if server-side logout fails; user must still appear logged out (fail-secure behavior).
-- **FR-15 (Should)**: Provide accessibility-compliant semantics for the logout control (focusable, descriptive label for assistive tech).
+- **FR-15 (Should)**: Logout control MUST be keyboard focusable and, if presented as an icon-only affordance, MUST include an accessible name (e.g., aria-label="Logout").
 - **FR-16 (Should)**: Emit a structured logout event (eventType=logout, userSurrogateId, timestampUTC, reason: manual|timeout|forced, wasOffline flag) if logging infrastructure is available. Logging failure must not impact user experience.
 - **FR-17 (Internal)**: Document assumptions and dependencies (existing authentication and session management facilities) for planning reference.
 
 ### Key Entities *(include if feature involves data)*
 - **Session**: Represents an authenticated continuity context linking a user to authorized actions until termination (attributes: creation time, last activity, status (active/expired/terminated)).
 - **Logout Event**: Conceptual record of a user-initiated or system-triggered termination (attributes: timestamp, initiating cause, session reference). *Whether persisted is TBD.*
-- **User Cached Data**: Locally stored user-specific state that must no longer be accessible post-logout (roster view data, character selection, profile attributes, personalization settings, user-specific feature flag evaluations, session-derived preferences), excluding analytics identifiers.
+- **User Cached Data**: Locally stored user-specific state that must no longer be accessible post-logout (roster view data, character selection, profile attributes, personalization settings, user-specific feature flag evaluations, session-derived preferences), excluding analytics identifiers (retained unchanged as clarified).
 
 ---
 
 ## Finalized Clarification Summary
-All previously identified ambiguities have been resolved within Functional Requirements FR-01 through FR-17. No open clarification items remain.
+All ambiguities raised to date are resolved through the Clarifications session (2025-09-26). Global logout semantics use lazy invalidation: other device sessions become invalid on first subsequent server interaction, not via proactive push. No explicit success banner or standalone signed-out page is presented; redirect itself signals completion. Unsaved-changes warning uses focused-field dirty heuristic only. Accessibility acceptance baseline: keyboard focusable + accessible name if icon-only. Analytics / telemetry identifiers are intentionally retained unchanged across logout (future rotation out of scope).
 
 ### Out of Scope (Explicit Exclusions)
-- Real-time push synchronization across tabs (lazy detection only is required).
-- Cross-session analytics/telemetry identifier rotation (treated separately from logout feature; identifiers not purged unless directly user-identifiable).
+- Real-time push synchronization across tabs or devices (lazy detection only is required).
+- Cross-session analytics/telemetry identifier rotation (treated separately from logout feature; identifiers not purged nor rotated at logout).
 - Performance SLOs beyond the 400ms progress indicator threshold (broader performance governance handled elsewhere).
 - Detailed audit retention policies (handled by platform governance, not this feature scope).
 - Multi-factor or upstream Identity Provider global sign-out semantics beyond application/session termination described here.
@@ -133,7 +149,7 @@ All previously identified ambiguities have been resolved within Functional Requi
 ### Requirement Completeness
 - [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous  
-- [x] Success criteria are measurable (see FR-07 progress threshold; FR-05 no stale protected content; FR-11 interaction-based propagation; FR-08 explicit detection rules)
+- [x] Success criteria are measurable (see FR-07 progress threshold; FR-05 no stale protected content; FR-08 dirty-field heuristic; FR-11 interaction-based propagation; FR-15 accessibility baseline; FR-09 analytics retention rule)
 - [x] Scope is clearly bounded (single feature: explicit session termination)
 - [x] Dependencies and assumptions identified (authentication system existence assumed)
 
@@ -148,6 +164,6 @@ All previously identified ambiguities have been resolved within Functional Requi
 - [x] User scenarios defined
 - [x] Requirements generated
 - [x] Entities identified
-- [ ] Review checklist passed (pending clarification resolution)
+- [x] Review checklist passed
 
 ---
