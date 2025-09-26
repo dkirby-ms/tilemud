@@ -32,6 +32,11 @@ Review the plan and other content and adjust as needed either by editing the mar
     /tasks Build out the tasks needed.
     ```
 
+Review the tasks list and edit as needed. Now you can proceed with using a coding agent to actually implement the tasks. Prompt the LLM to implement the tasks and "allow" commands as needed to proceed through development. Occassionally, you may need to run ```/tasks``` again to update progress.
+
+    ```
+    /tasks Update the tasks list to reflect completed tasks
+    ```
 
 ## Contributing
 Open issues or PRs with a clear description and tests/specs where applicable.
