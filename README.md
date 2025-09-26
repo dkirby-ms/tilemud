@@ -8,13 +8,7 @@ Tilemud is a small project that implements tile-based logic and related tooling.
 
 ## Specification-driven development
 
-[Speckit](https://github.com/github/spec-kit) is used to develop this game.
-
-    ```
-    /constitution Fill the constitution with the minimum requirements for a vite-based web client for a massively multiplayer tile placement game. 
-    ```
-
-Review the constitution.md and make any edits. 
+[Speckit](https://github.com/github/spec-kit) is used to develop this game. Adding new features should follow this specification-driven process.
 
     ```
     /specify I want a web app that allows users to login to the site, and then create a character that persists over subsequent logins. The user can select a name and character archetype. I already have an Entra ID external identities tenant setup for oauth with an app registration and userflow.
