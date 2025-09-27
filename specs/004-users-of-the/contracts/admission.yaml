@@ -1,0 +1,170 @@
+openapi: 3.0.3
+info:
+  title: TileMUD Connection Admission API
+  description: API for managing character connections to game server instances
+  version: 1.0.0
+  
+servers:
+  - url: http://localhost:3000
+    description: Development server
+
+paths:
+  /instances/{instanceId}/connect:
+    post:
+      summary: Request connection to game server instance
+      description: Attempt to connect an active character to a specific game server instance
+      parameters:
+        - name: instanceId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_-]+$'
+          description: Game server instance identifier
+        - name: replaceToken
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Token for replacing existing session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - characterId
+                - clientBuild
+              properties:
+                characterId:
+                  type: string
+                  format: uuid
+                  description: ID of the active character to connect
+                clientBuild:
+                  type: string
+                  description: Client build version
+                reconnectionToken:
+                  type: string
+                  format: uuid
+                  description: Token for reconnecting within grace period
+      responses:
+        '200':
+          description: Connection attempt processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdmissionResponse'
+        '429':
+          description: Rate limited
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - outcome
+                  - reason
+                  - retryAfterSeconds
+                properties:
+                  outcome:
+                    type: string
+                    enum: ['failed']
+                  reason:
+                    type: string
+                    enum: ['RATE_LIMITED']
+                  retryAfterSeconds:
+                    type: integer
+                    minimum: 1
+        '400':
+          description: Invalid request
+        '500':
+          description: Internal server error
+
+  /instances/{instanceId}/queue/status:
+    get:
+      summary: Get queue status for character
+      parameters:
+        - name: instanceId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_-]+$'
+        - name: characterId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Queue status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueStatusResponse'
+        '404':
+          description: Character not in queue
+
+components:
+  schemas:
+    AdmissionResponse:
+      type: object
+      required:
+        - outcome
+      properties:
+        outcome:
+          type: string
+          enum: ['success', 'queued', 'failed', 'timeout']
+        reason:
+          type: string
+          enum:
+            - 'NOT_AUTHENTICATED'
+            - 'NO_ACTIVE_CHARACTER'
+            - 'ALREADY_IN_SESSION'
+            - 'CAPACITY_FULL'
+            - 'QUEUE_FULL'
+            - 'VERSION_MISMATCH'
+            - 'MAINTENANCE'
+            - 'DRAIN_MODE'
+            - 'INVALID_INSTANCE'
+            - 'CHARACTER_SUSPENDED'
+            - 'RATE_LIMITED'
+            - 'TIMEOUT'
+            - 'INTERNAL_ERROR'
+        position:
+          type: integer
+          minimum: 0
+          description: Queue position (0-based) if outcome is 'queued'
+        retryAfterSeconds:
+          type: integer
+          minimum: 1
+          description: Seconds to wait before retry (for rate limited)
+        sessionId:
+          type: string
+          format: uuid
+          description: Session ID if outcome is 'success'
+        reconnectionToken:
+          type: string
+          format: uuid
+          description: Token for reconnection within grace period
+          
+    QueueStatusResponse:
+      type: object
+      required:
+        - position
+        - depth
+      properties:
+        position:
+          type: integer
+          minimum: 0
+          description: Current position in queue (0-based)
+        depth:
+          type: integer
+          minimum: 0
+          description: Total queue size
+        estimatedWaitSeconds:
+          type: integer
+          minimum: 0
+          description: Estimated wait time in seconds

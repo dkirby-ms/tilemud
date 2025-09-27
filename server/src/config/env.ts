@@ -31,6 +31,15 @@ const EnvSchema = z.object({
   TILE_TICK_INTERVAL_MS: z.string().transform(Number).pipe(z.number().int().min(50).max(1000)).default('100'),
   RECONNECT_GRACE_SECONDS: z.string().transform(Number).pipe(z.number().int().min(30).max(600)).default('120'),
 
+  // Connection Admission Configuration
+  CURRENT_CLIENT_BUILD: z.string().default('dev-build'),
+  CONNECTION_GRACE_SECONDS: z.string().transform(Number).pipe(z.number().int().min(30).max(300)).default('60'),
+  CONNECTION_TIMEOUT_SECONDS: z.string().transform(Number).pipe(z.number().int().min(5).max(30)).default('10'),
+  MAX_QUEUE_LENGTH: z.string().transform(Number).pipe(z.number().int().min(100).max(5000)).default('1000'),
+  CONNECTION_RATE_LIMIT: z.string().transform(Number).pipe(z.number().int().min(3).max(20)).default('5'),
+  CONNECTION_RATE_WINDOW_SECONDS: z.string().transform(Number).pipe(z.number().int().min(30).max(300)).default('60'),
+  CONNECTION_RATE_LOCK_SECONDS: z.string().transform(Number).pipe(z.number().int().min(30).max(300)).default('60'),
+
   // Rate Limiting
   CHAT_RATE_LIMIT: z.string().transform(Number).pipe(z.number().int().min(5).max(100)).default('20'),
   CHAT_RATE_WINDOW_SECONDS: z.string().transform(Number).pipe(z.number().int().min(1).max(60)).default('10'),
@@ -57,6 +66,15 @@ try {
 }
 
 export { config };
+
+// Redis key prefixes for feature isolation
+export const REDIS_KEYS = {
+  CONNECTION_SESSION: 'connection:session:',
+  CONNECTION_QUEUE: 'connection:queue:',
+  CONNECTION_RATE_LIMIT: 'connection:ratelimit:',
+  CONNECTION_GRACE: 'connection:grace:',
+  CONNECTION_METRICS: 'connection:metrics:',
+} as const;
 
 // Helper to validate required production settings
 export function validateProductionConfig(): void {

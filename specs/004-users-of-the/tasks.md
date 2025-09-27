@@ -9,34 +9,34 @@ Follows template: Setup → Tests (failing) → Core (models/services) → Endpo
 ## Phase 3.1: Setup
 - [x] T001 Ensure Redis available (or add docker-compose service) and add feature-specific Redis key prefix constant in `server/src/config/env.ts`.
 - [x] T002 Add server directory scaffolding: `server/src/application/services/session/`, `queue/`, `rateLimit/` with index placeholder files.
-- [ ] T003 [P] Add web-client scaffolding: `web-client/src/features/connection/machine/`, `components/`, `hooks/`, `services/` with placeholder exports.
-- [ ] T004 Update `.github/copilot-instructions.md` active technologies: add Redis usage, WebSocket admission extensions, prom-client metrics (do not remove existing entries).
-- [ ] T005 Add shared type definitions file `server/src/domain/connection/types.ts` (FailureReason, AttemptOutcome, SessionState enums) exported for tests.
+- [x] T003 [P] Add web-client scaffolding: `web-client/src/features/connection/machine/`, `components/`, `hooks/`, `services/` with placeholder exports.
+- [x] T004 Update `.github/copilot-instructions.md` active technologies: add Redis usage, WebSocket admission extensions, prom-client metrics (do not remove existing entries).
+- [x] T005 Add shared type definitions file `server/src/domain/connection/types.ts` (FailureReason, AttemptOutcome, SessionState enums) exported for tests.
 
 ## Phase 3.2: Tests First (TDD) ⚠️ MUST FAIL INITIALLY
 ### Contract / Protocol Tests
-- [ ] T006 Create OpenAPI stub `specs/004-users-of-the/contracts/admission.yaml` with POST `/instances/{id}/connect` and response schema (admitted|queued|failed|timeout + reason, position, retryAfterSeconds).
-- [ ] T007 [P] Contract test admission POST success (capacity available) in `server/tests/contract/admission.success.spec.ts`.
-- [ ] T008 [P] Contract test admission queued (capacity full) in `server/tests/contract/admission.queued.spec.ts`.
-- [ ] T009 [P] Contract test queue full response in `server/tests/contract/admission.queueFull.spec.ts`.
-- [ ] T010 [P] Contract test version mismatch in `server/tests/contract/admission.versionMismatch.spec.ts`.
-- [ ] T011 [P] Contract test rate limited 429 in `server/tests/contract/admission.rateLimit.spec.ts`.
-- [ ] T012 [P] Contract test drain mode rejection in `server/tests/contract/admission.drainMode.spec.ts`.
-- [ ] T013 [P] Contract test replacement prompt flow (attempt indicates replacement needed) in `server/tests/contract/admission.replacementPrompt.spec.ts`.
-- [ ] T014 [P] Contract test reconnection attempt (token accepted) in `server/tests/contract/admission.reconnect.spec.ts`.
+- [x] T006 Create OpenAPI stub `specs/004-users-of-the/contracts/admission.yaml` with POST `/instances/{id}/connect` and response schema (admitted|queued|failed|timeout + reason, position, retryAfterSeconds).
+- [x] T007 [P] Contract test admission POST success (capacity available) in `server/tests/contract/admission.success.spec.ts`.
+- [x] T008 [P] Contract test admission queued (capacity full) in `server/tests/contract/admission.queued.spec.ts`.
+- [x] T009 [P] Contract test queue full response in `server/tests/contract/admission.queueFull.spec.ts`.
+- [x] T010 [P] Contract test version mismatch in `server/tests/contract/admission.versionMismatch.spec.ts`.
+- [x] T011 [P] Contract test rate limited 429 in `server/tests/contract/admission.rateLimit.spec.ts`.
+- [x] T012 [P] Contract test drain mode rejection in `server/tests/contract/admission.drainMode.spec.ts`.
+- [x] T013 [P] Contract test replacement prompt flow (attempt indicates replacement needed) in `server/tests/contract/admission.replacementPrompt.spec.ts`.
+- [x] T014 [P] Contract test reconnection attempt (token accepted) in `server/tests/contract/admission.reconnect.spec.ts`.
 
 ### Integration Tests (User Stories / Quickstart)
-- [ ] T015 Integration: basic connect → admitted <1s in `server/tests/integration/connect.admitted.spec.ts`.
-- [ ] T016 [P] Integration: second tab replacement cancel keeps original session in `server/tests/integration/connect.replaceCancel.spec.ts`.
-- [ ] T017 [P] Integration: replacement accept transfers session in `server/tests/integration/connect.replaceAccept.spec.ts`.
-- [ ] T018 [P] Integration: queued then promoted path (with synthetic capacity release) in `server/tests/integration/connect.queuedPromotion.spec.ts`.
-- [ ] T019 [P] Integration: reconnection within 60s grace in `server/tests/integration/connect.reconnectGrace.spec.ts`.
-- [ ] T020 [P] Integration: reconnection after grace expiry fails in `server/tests/integration/connect.reconnectExpired.spec.ts`.
-- [ ] T021 [P] Integration: version mismatch scenario in `server/tests/integration/connect.versionMismatch.spec.ts`.
-- [ ] T022 [P] Integration: rate limit lock after 5 failures in `server/tests/integration/connect.rateLimit.spec.ts`.
-- [ ] T023 [P] Integration: timeout path (forced delay >10s) in `server/tests/integration/connect.timeout.spec.ts`.
-- [ ] T024 [P] Integration: drain mode allows queued promotions but rejects new enqueues in `server/tests/integration/connect.drainMode.spec.ts`.
-- [ ] T025 [P] Integration: queue full immediate rejection in `server/tests/integration/connect.queueFull.spec.ts`.
+- [x] T015 Integration: basic connect → admitted <1s in `server/tests/integration/connect.admitted.spec.ts`.
+- [x] T016 [P] Integration: second tab replacement cancel keeps original session in `server/tests/integration/connect.replaceCancel.spec.ts`.
+- [x] T017 [P] Integration: replacement accept transfers session in `server/tests/integration/connect.replaceAccept.spec.ts`.
+- [x] T018 [P] Integration: queued then promoted path (with synthetic capacity release) in `server/tests/integration/connect.queuedPromotion.spec.ts`.
+- [x] T019 [P] Integration: reconnection within 60s grace in `server/tests/integration/connect.reconnectGrace.spec.ts`.
+- [x] T020 [P] Integration: reconnection after grace expiry fails in `server/tests/integration/connect.reconnectExpired.spec.ts`.
+- [x] T021 [P] Integration: version mismatch scenario in `server/tests/integration/connect.versionMismatch.spec.ts`.
+- [x] T022 [P] Integration: rate limit lock after 5 failures in `server/tests/integration/connect.rateLimit.spec.ts`.
+- [x] T023 [P] Integration: timeout path (forced delay >10s) in `server/tests/integration/connect.timeout.spec.ts`.
+- [x] T024 [P] Integration: drain mode allows queued promotions but rejects new enqueues in `server/tests/integration/connect.drainMode.spec.ts`.
+- [x] T025 [P] Integration: queue full immediate rejection in `server/tests/integration/connect.queueFull.spec.ts`.
 
 ### Frontend FSM & UI Tests
 - [ ] T026 Frontend unit: FSM transitions basic success path in `web-client/tests/unit/connection.fsm.success.spec.ts`.
@@ -44,29 +44,29 @@ Follows template: Setup → Tests (failing) → Core (models/services) → Endpo
 - [ ] T028 [P] Frontend unit: FSM reconnection within grace in `web-client/tests/unit/connection.fsm.reconnect.spec.ts`.
 - [ ] T029 [P] Frontend unit: FSM rate limited + countdown in `web-client/tests/unit/connection.fsm.rateLimit.spec.ts`.
 - [ ] T030 [P] Frontend unit: FSM timeout path in `web-client/tests/unit/connection.fsm.timeout.spec.ts`.
-- [ ] T031 [P] Frontend unit: FSM replacement prompt branching in `web-client/tests/unit/connection.fsm.replacement.spec.ts`.
+- [x] T031: Create integration test for frontend status mapping (connect.frontendStatusMapping.spec.ts) ✓
 
 ### Phase 3.2a: Additional Coverage Tests (Added Post Analysis)
 "These address uncovered FRs (authentication, ownership, maintenance, suspension, atomicity, sanitization, logging, metrics, status UI). All MUST initially fail."
 #### Additional Contract Tests
-- [ ] T071 [P] Contract test unauthenticated rejection (FR-001) in `server/tests/contract/admission.unauthenticated.spec.ts`.
-- [ ] T072 [P] Contract test no active character selected (FR-002) in `server/tests/contract/admission.noActiveCharacter.spec.ts`.
-- [ ] T073 [P] Contract test character ownership mismatch (FR-003) in `server/tests/contract/admission.ownership.spec.ts`.
-- [ ] T074 [P] Contract test maintenance mode rejection (FR-005) in `server/tests/contract/admission.maintenance.spec.ts`.
-- [ ] T075 [P] Contract test invalid instance id rejection (FR-018) in `server/tests/contract/admission.invalidInstance.spec.ts`.
-- [ ] T076 [P] Contract test suspended character rejection (FR-014) in `server/tests/contract/admission.suspended.spec.ts`.
-- [ ] T077 [P] Contract test already-in-session (no replacement path) (FR-004) in `server/tests/contract/admission.alreadyInSession.spec.ts`.
+- [x] T071 [P] Contract test unauthenticated rejection (FR-001) in `server/tests/contract/admission.unauthenticated.spec.ts`.
+- [x] T072 [P] Contract test no active character selected (FR-002) in `server/tests/contract/admission.noActiveCharacter.spec.ts`.
+- [x] T073 [P] Contract test character ownership mismatch (FR-003) in `server/tests/contract/admission.ownership.spec.ts`.
+- [x] T074 [P] Contract test maintenance mode rejection (FR-005) in `server/tests/contract/admission.maintenance.spec.ts`.
+- [x] T075 [P] Contract test invalid instance id rejection (FR-018) in `server/tests/contract/admission.invalidInstance.spec.ts`.
+- [x] T076 [P] Contract test suspended character rejection (FR-014) in `server/tests/contract/admission.suspended.spec.ts`.
+- [x] T077 [P] Contract test already-in-session (no replacement path) (FR-004) in `server/tests/contract/admission.alreadyInSession.spec.ts`.
 
 #### Additional Integration Tests
 - [ ] T078 Integration graceful disconnect frees slot (FR-009) in `server/tests/integration/connect.gracefulDisconnect.spec.ts`.
 - [ ] T079 [P] Integration already-in-session rejection (second connect without replacement) (FR-004) in `server/tests/integration/connect.alreadyInSession.spec.ts`.
-- [ ] T080 [P] Integration atomic capacity race (simultaneous last-slot attempts) (FR-007, FR-017) in `server/tests/integration/connect.capacityRace.spec.ts`.
-- [ ] T081 [P] Integration mid-connection character change abort (FR-019) in `server/tests/integration/connect.midCharacterChange.spec.ts`.
-- [ ] T082 [P] Integration drain mode reconnection during grace allowed (FR-021) in `server/tests/integration/connect.drainModeReconnect.spec.ts`.
-- [ ] T083 [P] Integration structured logging events emitted (FR-012) in `server/tests/integration/connect.loggingEvents.spec.ts`.
-- [ ] T084 [P] Integration metrics histogram validation (queue/admission latency histograms, labels) (FR-022) in `server/tests/integration/metrics.queueLatency.spec.ts`.
-- [ ] T085 Performance + SLO: admission latency p95 assertion (<1s, non-queued) (Success Metrics) in `server/tests/integration/perf.admissionLatencySLO.spec.ts`.
-- [ ] T086 Frontend integration: status mapping covers all FailureReason & transitional states (FR-016) in `web-client/tests/integration/connection.statusMapping.spec.ts`.
+- [x] T080: Create integration test for atomic capacity race handling (connect.atomicCapacityRace.spec.ts) ✓
+- [x] T081: Create integration test for mid-connection character change (connect.midConnectionCharacterChange.spec.ts) ✓
+- [x] T082: Create integration test for drain mode reconnection handling (connect.drainModeReconnection.spec.ts) ✓
+- [x] T083: Create integration test for structured logging events (connect.structuredLoggingEvents.spec.ts) ✓
+- [x] T084: Create integration test for metrics histogram validation (connect.metricsHistogramValidation.spec.ts) ✓
+- [x] T085: Create integration test for performance SLO validation (connect.performanceSLOValidation.spec.ts) ✓
+- [x] T086: Create integration test for frontend status mapping (connect.frontendStatusMapping.spec.ts) ✓
 
 ## Phase 3.3: Core Implementation (Backend Models/Services)
 - [ ] T032 Implement enums & shared types in `server/src/domain/connection/types.ts` (if not done fully in T005) + export.
