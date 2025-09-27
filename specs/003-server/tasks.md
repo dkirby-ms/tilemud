@@ -81,7 +81,7 @@ T038 ✅: Integrate rule version stamping into room resolution flows (modify Are
 ✅ T044 [P]: WS integration test for reconnect within grace period `tests/integration/reconnect.grace.spec.ts`. (FR-009)
 ✅ T045 [P]: WS integration test for AI elasticity reduction trigger `tests/integration/ai.elasticity.spec.ts`. (FR-004)
 ✅ T046 [P]: WS integration test for soft-fail abort path `tests/integration/softfail.abort.spec.ts`. (FR-018)
-T047 [P]: Integration test for guild creation + uniqueness reservation `tests/integration/guild.creation.spec.ts`. (FR-006)
+✅ T047 [P]: Integration test for guild creation + uniqueness reservation `tests/integration/guild.creation.spec.ts`. (FR-006)
 T048 [P]: Integration test for chat tiered delivery semantics `tests/integration/chat.delivery.spec.ts`. (FR-007)
 T049 [P]: Integration test for replay availability & purge after expire `tests/integration/replay.retention.spec.ts`. (FR-017)
 T050 [P]: Unit tests for rate limiter logic `tests/unit/rateLimit.spec.ts`. (FR-012)

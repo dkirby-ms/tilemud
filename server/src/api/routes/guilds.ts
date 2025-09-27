@@ -48,16 +48,23 @@ export async function registerGuildRoutes(fastify: FastifyInstance) {
     update: async () => null,
     delete: async () => false,
     findMany: async () => [],
-    addMember: async () => ({ 
+    addMembership: async () => ({ 
       guildId: 'guild-123',
       playerId: 'player-456',
       role: 'member',
       joinedAt: new Date(),
     }),
-    removeMember: async () => false,
+    removeMembership: async () => false,
     updateMemberRole: async () => null,
     getMembersByGuildId: async () => [],
     getMembershipByPlayerId: async () => null,
+    getMembership: async () => null,
+    getMemberships: async () => [],
+    getPlayerMemberships: async () => [],
+    updateMembershipRole: async () => null,
+    incrementMemberCount: async () => undefined,
+    decrementMemberCount: async () => undefined,
+    isMemberCountValid: async () => true,
     checkNameAvailability: async () => true,
   } as any;
 
