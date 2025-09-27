@@ -1,0 +1,96 @@
+openapi: 3.1.0
+info:
+  title: TileMUD Backend HTTP APIs
+  version: 0.1.0
+paths:
+  /auth/session:
+    post:
+      summary: Exchange client auth token for session ticket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: Session ticket issued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ticket, playerId, expiresAt, supportedMessageVersions]
+                properties:
+                  ticket: { type: string }
+                  playerId: { type: string }
+                  expiresAt: { type: string, format: date-time }
+                  supportedMessageVersions: { type: array, items: { type: string } }
+        '401': { description: Invalid token }
+
+  /arenas:
+    get:
+      summary: List joinable arenas with utilization
+      responses:
+        '200':
+          description: Arena catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  arenas:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, tier, region, humans, capacity, utilization]
+                      properties:
+                        id: { type: string }
+                        tier: { type: string, enum: [small, large, epic] }
+                        region: { type: string }
+                        humans: { type: integer }
+                        capacity: { type: integer }
+                        utilization: { type: number }
+
+  /guilds:
+    post:
+      summary: Create a guild
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 3, maxLength: 32 }
+      responses:
+        '201': { description: Created }
+        '409': { description: Name already exists or reserved }
+
+  /replays/{id}:
+    get:
+      summary: Fetch replay metadata (and optionally stream)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Replay metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, instanceId, createdAt, sizeBytes, expiresAt]
+                properties:
+                  id: { type: string }
+                  instanceId: { type: string }
+                  createdAt: { type: string, format: date-time }
+                  sizeBytes: { type: integer }
+                  expiresAt: { type: string, format: date-time }
+        '404': { description: Not found }
