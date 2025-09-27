@@ -1,0 +1,50 @@
+{
+  "name": "tilemud-server",
+  "version": "0.1.0",
+  "description": "Scalable game service backend for TileMUD tile placement game",
+  "main": "dist/bootstrap/server.js",
+  "scripts": {
+    "dev:server": "ts-node src/bootstrap/dev.ts",
+    "build": "tsc",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "lint": "eslint src tests --ext .ts",
+    "lint:fix": "eslint src tests --ext .ts --fix"
+  },
+  "dependencies": {
+    "colyseus": "^0.15.0",
+    "uuid": "^9.0.1",
+    "zod": "^3.22.0",
+    "pg": "^8.11.0",
+    "redis": "^4.6.0",
+    "prom-client": "^15.0.0",
+    "pino": "^8.15.0",
+    "dotenv": "^16.3.0",
+    "fastify": "^4.24.0",
+    "@fastify/cors": "^8.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.0",
+    "@types/uuid": "^9.0.0",
+    "@types/pg": "^8.10.0",
+    "typescript": "^5.2.0",
+    "ts-node": "^10.9.0",
+    "vitest": "^0.34.0",
+    "supertest": "^6.3.0",
+    "@types/supertest": "^2.0.0",
+    "eslint": "^8.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0"
+  },
+  "keywords": [
+    "game",
+    "realtime",
+    "colyseus",
+    "websocket"
+  ],
+  "author": "TileMUD Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
