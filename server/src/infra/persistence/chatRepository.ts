@@ -35,6 +35,10 @@ export interface IChatRepository {
     messageCount: number;
     lastMessageAt?: Date;
   }>;
+  
+  // Retention management methods
+  findExpiredMessages(channelType: string, cutoffDate: Date, limit: number, offset: number): Promise<ChatMessage[]>;
+  deleteMessage(messageId: string): Promise<boolean>;
 }
 
 // Basic Postgres implementation stub
@@ -113,6 +117,14 @@ export class PostgresChatRepository implements IChatRepository {
     messageCount: number;
     lastMessageAt?: Date;
   }> {
+    throw new Error('Not implemented yet');
+  }
+
+  async findExpiredMessages(_channelType: string, _cutoffDate: Date, _limit: number, _offset: number): Promise<ChatMessage[]> {
+    throw new Error('Not implemented yet');
+  }
+
+  async deleteMessage(_messageId: string): Promise<boolean> {
     throw new Error('Not implemented yet');
   }
 }

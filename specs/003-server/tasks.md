@@ -54,15 +54,15 @@ T013: Implement rate limiter service `application/services/rateLimitService.ts` 
 ✅ T027: Implement presence & heartbeat processing shared module `src/ws/presence/heartbeat.ts` (FR-009). (Depends: T023)
 
 ### HTTP Endpoints (REST)
-T028: Implement POST /auth/session route `src/api/routes/auth.ts` issuing ticket (FR-009). (Depends: T016, T003)
-T029: Implement GET /arenas route `src/api/routes/arenas.ts` (FR-002, FR-011). (Depends: T017, T003)
-T030: Implement POST /guilds route `src/api/routes/guilds.ts` (FR-006). (Depends: T018, T003)
-T031: Implement GET /replays/:id route `src/api/routes/replays.ts` (FR-017). (Depends: T019, T003)
+T028 [A]: ✅ HTTP route for session ticket issuance `src/api/routes/auth.ts` implementing POST `/auth/session`. (FR-009)
+T029: ✅ Implement GET /arenas route `src/api/routes/arenas.ts` (FR-002, FR-011). (Depends: T017, T003)
+T030: ✅ Implement POST /guilds route `src/api/routes/guilds.ts` (FR-006). (Depends: T018, T003)
+T031: ✅ Implement GET /replays/:id route `src/api/routes/replays.ts` (FR-017). (Depends: T019, T003)
 
 ### Replay & Persistence Jobs
-T032: Implement replay writer hook (append events + finalize metadata) `application/services/replayWriter.ts`. (Depends: T024, T025)
-T033: Implement replay purge job (cron / interval) `application/jobs/replayPurgeJob.ts`. (Depends: T019)
-T034: Implement chat retention purge job `application/jobs/chatRetentionJob.ts`. (Depends: T022)
+T032: ✅ Implement replay writer hook (append events + finalize metadata) `application/services/replayWriter.ts`. (Depends: T024, T025)
+T033: ✅ Implement replay purge job (cron / interval) `application/jobs/replayPurgeJob.ts`. (Depends: T019)
+T034 ✅: Implement chat retention purge job `application/jobs/chatRetentionJob.ts`. (Depends: T022)
 
 ### Moderation & Social
 T035: Implement block list enforcement middleware for incoming chat / direct messages `application/middleware/blockList.ts` (FR-014). (Depends: T011)

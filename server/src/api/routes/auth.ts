@@ -1,33 +1,33 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { createAuthService, AuthService } from '../../application/services/authService';
-import { PostgresPlayersRepository } from '../../infra/persistence/playersRepository';
+import { z } from 'zod';
+import { AuthService, AuthTokenInput } from '../../application/services/authService';
 import { createServiceLogger } from '../../infra/monitoring/logger';
-import { recordPlayerAction } from '../../infra/monitoring/metrics';
 
 const logger = createServiceLogger('AuthRoutes');
 
-// Request/Response types
-interface AuthSessionRequest {
-  token: string;
-  displayName?: string;
-  clientInfo?: {
-    userAgent?: string;
-    platform?: string;
-  };
-}
+// Request/Response schemas
+const AuthSessionRequestSchema = z.object({
+  token: z.string().min(1, 'Token is required'),
+  playerDisplayName: z.string().min(3).max(32).optional(),
+});
 
-interface AuthSessionResponse {
-  sessionTicket: string;
-  playerId: string;
-  displayName: string;
-  expiresAt: number;
-}
+const AuthSessionResponseSchema = z.object({
+  sessionTicket: z.string(),
+  playerId: z.string(), 
+  displayName: z.string(),
+  expiresAt: z.number(),
+});
 
-interface AuthErrorResponse {
-  error: string;
-  code: 'INVALID_TOKEN' | 'SERVICE_UNAVAILABLE' | 'RATE_LIMITED';
-  message: string;
-}
+const ErrorResponseSchema = z.object({
+  error: z.string(),
+  code: z.string().optional(),
+  details: z.any().optional(),
+  retryAfterMs: z.number().optional(),
+});
+
+type AuthSessionRequest = z.infer<typeof AuthSessionRequestSchema>;
+type AuthSessionResponse = z.infer<typeof AuthSessionResponseSchema>;
+type ErrorResponse = z.infer<typeof ErrorResponseSchema>;
 
 /**
  * Register authentication routes
@@ -49,208 +49,144 @@ export async function registerAuthRoutes(fastify: FastifyInstance) {
     updateLastLogin: async () => undefined,
   } as any;
 
-  const authService: AuthService = createAuthService(stubRepo);
+  const authService = new AuthService(stubRepo);
 
   // POST /auth/session - Issue session ticket
   fastify.post<{
-    Body: AuthSessionRequest;
-    Reply: AuthSessionResponse | AuthErrorResponse;
+    Body: AuthSessionRequest,
+    Reply: AuthSessionResponse | ErrorResponse
   }>('/auth/session', {
     schema: {
-      description: 'Issue a session ticket for authenticated access to game services',
-      tags: ['Authentication'],
       body: {
         type: 'object',
         required: ['token'],
         properties: {
           token: {
             type: 'string',
-            description: 'Authentication token from external provider',
             minLength: 1,
           },
-          displayName: {
+          playerDisplayName: {
             type: 'string',
-            description: 'Optional player display name',
+            minLength: 3,
             maxLength: 32,
-          },
-          clientInfo: {
-            type: 'object',
-            properties: {
-              userAgent: { type: 'string' },
-              platform: { type: 'string' },
-            },
           },
         },
       },
       response: {
         200: {
           type: 'object',
-          required: ['sessionTicket', 'playerId', 'displayName', 'expiresAt'],
           properties: {
-            sessionTicket: {
-              type: 'string',
-              description: 'Session ticket for WebSocket authentication',
-            },
-            playerId: {
-              type: 'string',
-              description: 'Unique player identifier',
-            },
-            displayName: {
-              type: 'string',
-              description: 'Player display name',
-            },
-            expiresAt: {
-              type: 'number',
-              description: 'Ticket expiration timestamp (Unix milliseconds)',
-            },
+            sessionTicket: { type: 'string' },
+            playerId: { type: 'string' },
+            displayName: { type: 'string' },
+            expiresAt: { type: 'number' },
           },
         },
         400: {
           type: 'object',
-          required: ['error', 'code', 'message'],
           properties: {
             error: { type: 'string' },
             code: { type: 'string' },
-            message: { type: 'string' },
           },
         },
         401: {
           type: 'object',
-          required: ['error', 'code', 'message'],
           properties: {
             error: { type: 'string' },
             code: { type: 'string' },
-            message: { type: 'string' },
-          },
-        },
-        503: {
-          type: 'object',
-          required: ['error', 'code', 'message'],
-          properties: {
-            error: { type: 'string' },
-            code: { type: 'string' },
-            message: { type: 'string' },
           },
         },
       },
     },
   }, async (request: FastifyRequest<{ Body: AuthSessionRequest }>, reply: FastifyReply) => {
     const startTime = Date.now();
+    const { token, playerDisplayName } = request.body;
 
     try {
-      const { token, displayName, clientInfo } = request.body;
+      // Validate and sanitize input
+      const authInput: AuthTokenInput = {
+        token: token.trim(),
+        playerDisplayName: playerDisplayName?.trim(),
+      };
 
-      logger.info({
-        event: 'auth_session_request',
-        ip: request.ip,
-        userAgent: request.headers['user-agent'],
-        displayName,
-        hasClientInfo: !!clientInfo,
-      }, 'Session ticket request received');
+      // Call auth service
+      const result = await authService.issueSessionTicket(authInput);
 
-      // Validate request
-      if (!token || typeof token !== 'string' || token.trim().length === 0) {
-        const errorResponse: AuthErrorResponse = {
-          error: 'Invalid request',
-          code: 'INVALID_TOKEN',
-          message: 'Authentication token is required and must be a non-empty string',
+      const processingTime = Date.now() - startTime;
+
+      if (result.success && result.ticket) {
+        const response: AuthSessionResponse = {
+          sessionTicket: result.ticket.sessionId,
+          playerId: result.ticket.playerId,
+          displayName: result.ticket.displayName,
+          expiresAt: result.ticket.expiresAt.getTime(),
+        };
+
+        logger.info({
+          event: 'session_ticket_issued',
+          processingTimeMs: processingTime,
+          metadata: {
+            playerId: result.ticket.playerId,
+            displayName: result.ticket.displayName,
+            expiresAt: result.ticket.expiresAt,
+          },
+        }, `Session ticket issued for player: ${result.ticket.playerId}`);
+
+        return reply.code(200).send(response);
+      }
+
+      // Handle auth failures
+      if (result.retryAfterMs) {
+        const rateLimitResponse: ErrorResponse = {
+          error: result.error || 'Too many authentication attempts',
+          code: 'RATE_LIMITED',
+          retryAfterMs: result.retryAfterMs,
         };
 
         logger.warn({
-          event: 'auth_validation_failed',
-          ip: request.ip,
-          reason: 'missing_or_invalid_token',
-        }, 'Authentication validation failed');
+          event: 'auth_rate_limited',
+          processingTimeMs: processingTime,
+          metadata: { retryAfterMs: result.retryAfterMs },
+        }, 'Authentication rate limited');
 
-        recordPlayerAction('auth_session', 'validation', 'failure');
-        return reply.status(400).send(errorResponse);
+        return reply.code(429).send(rateLimitResponse);
       }
 
-      // Issue session ticket
-      const result = await authService.issueSessionTicket({
-        inputToken: token.trim(),
-        displayName: displayName?.trim() || undefined,
-        metadata: {
-          ip: request.ip,
-          userAgent: request.headers['user-agent'],
-          clientInfo,
-          timestamp: Date.now(),
-        },
-      });
-
-      const response: AuthSessionResponse = {
-        sessionTicket: result.sessionTicket,
-        playerId: result.playerId,
-        displayName: result.displayName,
-        expiresAt: result.expiresAt,
+      const authFailedResponse: ErrorResponse = {
+        error: result.error || 'Authentication failed',
+        code: 'INVALID_TOKEN',
       };
 
-      const duration = Date.now() - startTime;
+      logger.warn({
+        event: 'auth_failed',
+        processingTimeMs: processingTime,
+        metadata: { error: result.error },
+      }, 'Authentication failed');
 
-      logger.info({
-        event: 'auth_session_issued',
-        playerId: result.playerId,
-        displayName: result.displayName,
-        expiresAt: result.expiresAt,
-        duration,
-        ip: request.ip,
-      }, `Session ticket issued for player: ${result.playerId}`);
-
-      recordPlayerAction('auth_session', 'issue', 'success');
-      return reply.status(200).send(response);
+      return reply.code(401).send(authFailedResponse);
 
     } catch (error) {
-      const duration = Date.now() - startTime;
-
+      const processingTime = Date.now() - startTime;
+      
       logger.error({
-        event: 'auth_session_error',
+        event: 'auth_error',
         error: error instanceof Error ? error.message : 'Unknown error',
-        duration,
-        ip: request.ip,
-      }, `Session ticket issuance failed: ${error}`);
+        processingTimeMs: processingTime,
+        metadata: { stack: error instanceof Error ? error.stack : undefined },
+      }, 'Authentication service error');
 
-      // Handle specific error types
-      if (error instanceof Error) {
-        if (error.message.includes('invalid token') || error.message.includes('unauthorized')) {
-          const errorResponse: AuthErrorResponse = {
-            error: 'Authentication failed',
-            code: 'INVALID_TOKEN',
-            message: 'The provided authentication token is invalid or expired',
-          };
-
-          recordPlayerAction('auth_session', 'validation', 'failure');
-          return reply.status(401).send(errorResponse);
-        }
-
-        if (error.message.includes('rate limit')) {
-          const errorResponse: AuthErrorResponse = {
-            error: 'Rate limited',
-            code: 'RATE_LIMITED',
-            message: 'Too many authentication requests. Please try again later.',
-          };
-
-          recordPlayerAction('auth_session', 'rate_limit', 'rate_limited');
-          return reply.status(429).send(errorResponse);
-        }
-      }
-
-      // Generic service error
-      const errorResponse: AuthErrorResponse = {
-        error: 'Service unavailable',
-        code: 'SERVICE_UNAVAILABLE',
-        message: 'Authentication service is temporarily unavailable. Please try again later.',
+      const errorResponse: ErrorResponse = {
+        error: 'Internal server error',
+        code: 'INTERNAL_ERROR',
       };
 
-      recordPlayerAction('auth_session', 'service', 'failure');
-      return reply.status(503).send(errorResponse);
+      return reply.code(500).send(errorResponse);
     }
   });
 
-  // GET /auth/health - Health check endpoint
+  // GET /auth/health - Health check
   fastify.get('/auth/health', {
     schema: {
-      description: 'Authentication service health check',
-      tags: ['Authentication', 'Health'],
       response: {
         200: {
           type: 'object',
@@ -262,16 +198,11 @@ export async function registerAuthRoutes(fastify: FastifyInstance) {
         },
       },
     },
-  }, async (_request, reply) => {
-    // TODO: Add actual health checks (DB connectivity, external auth service, etc.)
-    return reply.status(200).send({
+  }, async (_request: FastifyRequest, reply: FastifyReply) => {
+    return reply.code(200).send({
       status: 'healthy',
       timestamp: Date.now(),
       service: 'authentication',
     });
   });
-
-  logger.info({
-    event: 'auth_routes_registered',
-  }, 'Authentication routes registered successfully');
 }
