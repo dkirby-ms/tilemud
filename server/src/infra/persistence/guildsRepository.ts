@@ -34,6 +34,7 @@ export interface IGuildsRepository {
 
 // Basic Postgres implementation stub
 export class PostgresGuildsRepository implements IGuildsRepository {
+  // @ts-ignore - Intentionally unused parameter for implementation stub
   constructor(private readonly _db: unknown) {} // TODO: Replace with proper DB client type
 
   async findById(_id: string): Promise<Guild | null> {

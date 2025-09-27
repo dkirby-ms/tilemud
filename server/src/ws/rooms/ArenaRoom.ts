@@ -4,13 +4,22 @@ import { createServiceLogger } from '../../infra/monitoring/logger';
 import { 
   recordPlayerAction, 
   updatePlayerCount,
-  recordWsLatency 
+  recordWsLatency,
+  recordTileTickDuration,
+  recordConflictResolution,
+  recordBroadcast
 } from '../../infra/monitoring/metrics';
 import { createSoftFailMonitor, SoftFailMonitor } from '../../application/services/softFailMonitor';
 import { createAiElasticityMonitor, AiElasticityMonitor } from '../../application/services/aiElasticityMonitor';
-import { createChatDeliveryDispatcher, ChatDeliveryDispatcher } from '../../application/services/chatDeliveryDispatcher';
+import { ChatDeliveryDispatcher } from '../../application/services/chatDeliveryDispatcher';
 import { PostgresSessionsRepository, ISessionsRepository } from '../../infra/persistence/sessionsRepository';
 import { createRuleConfigService, RuleConfigService, RuleVersionStamp } from '../../application/services/ruleConfigService';
+import { BlockListMiddleware } from '../../application/middleware/blockList';
+import { PostgresPlayersRepository } from '../../infra/persistence/playersRepository';
+import { ModerationService } from '../../application/services/moderationService';
+import { PostgresGuildsRepository } from '../../infra/persistence/guildsRepository';
+import { ReplayWriter } from '../../application/services/replayWriter';
+import { PostgresReplayRepository } from '../../infra/persistence/replayRepository';
 
 // Room state schemas
 export class TileState extends Schema {
@@ -83,6 +92,9 @@ export class ArenaRoom extends Room<ArenaState> {
   private readonly chatDispatcher: ChatDeliveryDispatcher;
   private readonly sessionsRepo: ISessionsRepository;
   private readonly ruleConfigService: RuleConfigService;
+  private readonly blockListMiddleware: BlockListMiddleware;
+  private readonly moderationService: ModerationService;
+  private readonly replayWriter: ReplayWriter;
 
   // Room configuration
   private readonly MAX_TILES_PER_PLAYER = 100;
@@ -101,11 +113,17 @@ export class ArenaRoom extends Room<ArenaState> {
     super();
     
     // Initialize services
+    const playersRepo = new PostgresPlayersRepository({});
+    const guildsRepo = new PostgresGuildsRepository({});
+    const replayRepo = new PostgresReplayRepository({});
     this.sessionsRepo = new PostgresSessionsRepository({});
     this.softFailMonitor = createSoftFailMonitor(this.sessionsRepo);
     this.aiElasticityMonitor = createAiElasticityMonitor();
-    this.chatDispatcher = createChatDeliveryDispatcher();
+    this.blockListMiddleware = new BlockListMiddleware(playersRepo);
+    this.chatDispatcher = new ChatDeliveryDispatcher(undefined, this.blockListMiddleware);
     this.ruleConfigService = createRuleConfigService();
+    this.moderationService = new ModerationService(playersRepo, guildsRepo);
+    this.replayWriter = new ReplayWriter(replayRepo);
   }
 
   override async onCreate(options: ArenaOptions = {}) {
@@ -128,6 +146,37 @@ export class ArenaRoom extends Room<ArenaState> {
     // Initialize rule configuration version stamping
     await this.initializeRuleVersion();
 
+    // Initialize replay recording
+    try {
+      await this.replayWriter.initializeReplay(this.state.arenaId);
+      
+      // Record arena creation event
+      await this.replayWriter.appendEvent(this.state.arenaId, {
+        type: 'arena_created',
+        data: {
+          arenaId: this.state.arenaId,
+          tier: this.state.tier,
+          maxPlayers: this.state.maxPlayers,
+          ruleConfigVersion: this.state.ruleConfigVersion,
+          startTime: this.state.startTime,
+        },
+        metadata: {
+          roomId: this.roomId,
+          tick: 0,
+        },
+      });
+
+      this.roomLogger.debug({
+        event: 'replay_initialized',
+        arenaId: this.state.arenaId,
+      }, 'Replay recording initialized');
+    } catch (error) {
+      this.roomLogger.error({
+        event: 'replay_init_error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }, 'Failed to initialize replay recording');
+    }
+
     // Set room metadata
     this.setMetadata({
       arenaId: this.state.arenaId,
@@ -148,6 +197,9 @@ export class ArenaRoom extends Room<ArenaState> {
     this.onMessage('place_tile', this.handlePlaceTile.bind(this));
     this.onMessage('chat', this.handleChatMessage.bind(this));
     this.onMessage('ready', this.handlePlayerReady.bind(this));
+    this.onMessage('mute_player', this.handleMutePlayer.bind(this));
+    this.onMessage('unmute_player', this.handleUnmutePlayer.bind(this));
+    this.onMessage('kick_player', this.handleKickPlayer.bind(this));
 
     this.roomLogger.debug({
       event: 'arena_room_configured',
@@ -430,6 +482,24 @@ export class ArenaRoom extends Room<ArenaState> {
         timestamp: Date.now(),
       });
 
+      // Record tile placement event in replay
+      if (this.replayWriter) {
+        await this.replayWriter.appendEvent(this.state.arenaId, {
+          type: 'tile_placed',
+          data: {
+            playerId: client.sessionId,
+            x: message.x,
+            y: message.y,
+            color: message.color,
+            tileCount: playerState.tileCount + 1,
+          },
+          metadata: {
+            roomId: this.roomId,
+            tick: this.state.currentTick,
+          },
+        });
+      }
+
       recordPlayerAction('place_tile', this.state.arenaId, 'success');
 
     } catch (error) {
@@ -465,14 +535,34 @@ export class ArenaRoom extends Room<ArenaState> {
       const result = await this.chatDispatcher.sendMessage(chatMessage);
       
       if (result.success) {
+        // Record chat message in replay
+        if (this.replayWriter) {
+          await this.replayWriter.appendEvent(this.state.arenaId, {
+            type: 'chat_message',
+            data: {
+              senderId: client.id,
+              recipientId: message.recipientId,
+              channelType: message.channelType || 'arena',
+              content: message.content,
+            },
+            metadata: {
+              roomId: this.roomId,
+              tick: this.state.currentTick,
+            },
+          });
+        }
+
         // Broadcast to relevant clients
         if (message.channelType === 'arena') {
+          const broadcastStartTime = Date.now();
           this.broadcast('chat_message', {
             senderId: client.id,
             senderName: playerState.displayName,
             content: message.content,
             timestamp: chatMessage.timestamp.getTime(),
           });
+          const broadcastDuration = Date.now() - broadcastStartTime;
+          recordBroadcast(broadcastDuration, 'chat_message', this.clients.length);
         } else if (message.channelType === 'private' && message.recipientId) {
           // Send to specific recipient
           this.clients.forEach(c => {
@@ -512,6 +602,183 @@ export class ArenaRoom extends Room<ArenaState> {
       if (allReady && this.clients.length >= 2) {
         this.startIntensiveGameplay();
       }
+    }
+  }
+
+  // Moderation handlers
+
+  private async handleMutePlayer(client: Client, message: { targetPlayerId: string; durationMs?: number; reason?: string }) {
+    try {
+      const moderatorPlayer = this.state.players.get(client.id);
+      if (!moderatorPlayer) {
+        return;
+      }
+
+      const result = await this.moderationService.mutePlayer({
+        moderatorId: client.id,
+        targetPlayerId: message.targetPlayerId,
+        durationMs: message.durationMs || 5 * 60 * 1000, // Default 5 minutes
+        reason: message.reason || 'Arena moderation',
+        scope: 'arena',
+        scopeId: this.state.arenaId,
+      });
+
+      if (result.success) {
+        // Record moderation action in replay
+        if (this.replayWriter) {
+          await this.replayWriter.appendEvent(this.state.arenaId, {
+            type: 'player_muted',
+            data: {
+              moderatorId: client.id,
+              targetPlayerId: message.targetPlayerId,
+              durationMs: message.durationMs || 5 * 60 * 1000,
+              reason: message.reason || 'Arena moderation',
+            },
+            metadata: {
+              roomId: this.roomId,
+              tick: this.state.currentTick,
+            },
+          });
+        }
+
+        this.broadcast('player_muted', {
+          targetPlayerId: message.targetPlayerId,
+          durationMs: message.durationMs || 5 * 60 * 1000,
+          reason: message.reason || 'Arena moderation',
+          moderatorId: client.id,
+        });
+        recordBroadcast(0, 'player_muted', this.clients.length); // Quick broadcast, no timing needed
+
+        this.roomLogger.info({
+          event: 'player_muted',
+          moderatorId: client.id,
+          targetPlayerId: message.targetPlayerId,
+          durationMs: message.durationMs,
+          reason: message.reason,
+        }, `Player muted in arena: ${message.targetPlayerId}`);
+      } else {
+        client.send('moderation_error', { error: result.error });
+      }
+    } catch (error) {
+      this.roomLogger.error({
+        event: 'mute_error',
+        moderatorId: client.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }, 'Failed to mute player');
+      
+      client.send('moderation_error', { error: 'Failed to mute player' });
+    }
+  }
+
+  private async handleUnmutePlayer(client: Client, message: { targetPlayerId: string }) {
+    try {
+      const moderatorPlayer = this.state.players.get(client.id);
+      if (!moderatorPlayer) {
+        return;
+      }
+
+      const result = await this.moderationService.unmutePlayer({
+        moderatorId: client.id,
+        targetPlayerId: message.targetPlayerId,
+        scope: 'arena',
+        scopeId: this.state.arenaId,
+      });
+
+      if (result.success) {
+        this.broadcast('player_unmuted', {
+          targetPlayerId: message.targetPlayerId,
+          moderatorId: client.id,
+        });
+
+        this.roomLogger.info({
+          event: 'player_unmuted',
+          moderatorId: client.id,
+          targetPlayerId: message.targetPlayerId,
+        }, `Player unmuted in arena: ${message.targetPlayerId}`);
+      } else {
+        client.send('moderation_error', { error: result.error });
+      }
+    } catch (error) {
+      this.roomLogger.error({
+        event: 'unmute_error',
+        moderatorId: client.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }, 'Failed to unmute player');
+      
+      client.send('moderation_error', { error: 'Failed to unmute player' });
+    }
+  }
+
+  private async handleKickPlayer(client: Client, message: { targetPlayerId: string; reason?: string }) {
+    try {
+      const moderatorPlayer = this.state.players.get(client.id);
+      if (!moderatorPlayer) {
+        return;
+      }
+
+      const result = await this.moderationService.kickPlayer({
+        moderatorId: client.id,
+        targetPlayerId: message.targetPlayerId,
+        reason: message.reason || 'Arena moderation',
+        scope: 'arena',
+        scopeId: this.state.arenaId,
+      });
+
+      if (result.success) {
+        // Record moderation action in replay
+        if (this.replayWriter) {
+          await this.replayWriter.appendEvent(this.state.arenaId, {
+            type: 'player_kicked',
+            data: {
+              moderatorId: client.id,
+              targetPlayerId: message.targetPlayerId,
+              reason: message.reason || 'Arena moderation',
+            },
+            metadata: {
+              roomId: this.roomId,
+              tick: this.state.currentTick,
+            },
+          });
+        }
+
+        // Find and disconnect the target player
+        const targetClient = this.clients.find(c => c.id === message.targetPlayerId);
+        if (targetClient) {
+          targetClient.send('kicked_from_room', {
+            reason: message.reason || 'Arena moderation',
+            moderatorId: client.id,
+          });
+          
+          // Give them a moment to receive the message, then disconnect
+          setTimeout(() => {
+            targetClient.leave(1000); // Normal closure
+          }, 1000);
+        }
+
+        this.broadcast('player_kicked', {
+          targetPlayerId: message.targetPlayerId,
+          reason: message.reason || 'Arena moderation',
+          moderatorId: client.id,
+        });
+        recordBroadcast(0, 'player_kicked', this.clients.length); // Quick broadcast, no timing needed
+
+        this.roomLogger.info({
+          event: 'player_kicked',
+          moderatorId: client.id,
+          targetPlayerId: message.targetPlayerId,
+          reason: message.reason,
+        }, `Player kicked from arena: ${message.targetPlayerId}`);
+      } else {
+        client.send('moderation_error', { error: result.error });
+      }
+    } catch (error) {
+      this.roomLogger.error({
+        event: 'kick_error',
+        moderatorId: client.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }, 'Failed to kick player');
+      
+      client.send('moderation_error', { error: 'Failed to kick player' });
     }
   }
 
@@ -597,7 +864,9 @@ export class ArenaRoom extends Room<ArenaState> {
   // Tile processing
 
   private processTileQueue() {
+    const startTime = Date.now();
     const processedTiles: Array<{ tileId: string; x: number; y: number; playerId: string; color: string }> = [];
+    let conflictsResolved = 0;
     
     // Process all queued tiles
     while (this.tileQueue.length > 0) {
@@ -609,6 +878,7 @@ export class ArenaRoom extends Room<ArenaState> {
       const existingTile = this.state.tiles.get(tileId);
       if (existingTile) {
         this.conflictCount++;
+        conflictsResolved++;
         client.send('tile_rejected', {
           x: message.x,
           y: message.y,
@@ -644,10 +914,21 @@ export class ArenaRoom extends Room<ArenaState> {
 
     // Broadcast successful tile updates
     if (processedTiles.length > 0) {
+      const broadcastStartTime = Date.now();
       this.broadcast('tiles_updated', {
         tiles: processedTiles,
         tick: this.state.currentTick,
       });
+      const broadcastDuration = Date.now() - broadcastStartTime;
+      recordBroadcast(broadcastDuration, 'tiles_updated', this.clients.length);
+    }
+
+    // Record performance metrics
+    const totalDuration = Date.now() - startTime;
+    recordTileTickDuration(totalDuration, this.state.arenaId, this.clients.length);
+    
+    if (conflictsResolved > 0) {
+      recordConflictResolution(totalDuration, this.state.arenaId, conflictsResolved);
     }
   }
 

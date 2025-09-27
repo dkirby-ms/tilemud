@@ -84,35 +84,35 @@ T038 ✅: Integrate rule version stamping into room resolution flows (modify Are
 ✅ T047 [P]: Integration test for guild creation + uniqueness reservation `tests/integration/guild.creation.spec.ts`. (FR-006)
 ✅ T048 [P]: Integration test for chat tiered delivery semantics `tests/integration/chat.delivery.spec.ts`. (FR-007)
 ✅ T049 [P]: Integration test for replay availability & purge after expire `tests/integration/replay.retention.spec.ts`. (FR-017)
-T050 [P]: Unit tests for rate limiter logic `tests/unit/rateLimit.spec.ts`. (FR-012)
-T051 [P]: Unit tests for quorum logic (soft-fail monitor) `tests/unit/softFailMonitor.spec.ts`. (FR-018)
-T052 [P]: Unit tests for rule config service & stamping `tests/unit/ruleConfigService.spec.ts`. (FR-016)
-T053 [P]: Unit tests for chat dispatcher de-dup/idempotency `tests/unit/chatDispatcher.spec.ts`. (FR-007)
-T054 [P]: Unit tests for AI elasticity monitor thresholds `tests/unit/aiElasticityMonitor.spec.ts`. (FR-004)
-T055 [P]: Unit tests for replay writer sequence integrity `tests/unit/replayWriter.spec.ts`. (FR-017)
+✅ T050 [P]: Unit tests for rate limiter logic `tests/unit/rateLimit.spec.ts`. (FR-012)
+✅ T051 [P]: Unit tests for quorum logic (soft-fail monitor) `tests/unit/softFailMonitor.spec.ts`. (FR-018)
+✅ T052 [P]: Unit tests for rule config service & stamping `tests/unit/ruleConfigService.spec.ts`. (FR-016)
+✅ T053 [P]: Unit tests for chat dispatcher de-dup/idempotency `tests/unit/chatDispatcher.spec.ts`. (FR-007)
+✅ T054 [P]: Unit tests for AI elasticity monitor thresholds `tests/unit/aiElasticityMonitor.spec.ts`. (FR-004)
+✅ T055 [P]: Unit tests for replay writer sequence integrity `tests/unit/replayWriter.spec.ts`. (FR-017)
 
 ### Integration & Wiring
 ✅ T056: Wire HTTP routes into main express/fastify server (choose framework) `src/api/server.ts`. (Depends: T028-T031)
 ✅ T057: Implement bootstrap script `src/bootstrap/dev.ts` starting DB/Redis connections, HTTP, Colyseus. (Depends: T023, T028)
 ✅ T058: Integrate metrics endpoint `/metrics` & health checks `src/api/routes/health.ts`. (Depends: T014, T056)
-T059: Add block list middleware integration at chat dispatcher & room joins. (Depends: T035, T024, T025)
-T060: Integrate moderation commands (mute/kick) into ArenaRoom & BattleRoom handlers. (Depends: T036, T024, T025)
-T061: Integrate replay writer & rule stamping into resolution flows. (Depends: T032, T038)
+✅ T059: Add block list middleware integration at chat dispatcher & room joins. (Depends: T035, T024, T025)
+✅ T060: Integrate moderation commands (mute/kick) into ArenaRoom & BattleRoom handlers. (Depends: T036, T024, T025)
+✅ T061: Integrate replay writer & rule stamping into resolution flows. (Depends: T032, T038)
 
 ### Performance & Observability
-T062: Add latency histograms wrapping tile resolution & broadcast paths. (Depends: T024, T025, T014)
-T063: Add load test scripts placeholder `server/tools/load/` simulating 200 concurrent arena users. (Depends: T023)
+✅ T062: Add latency histograms wrapping tile resolution & broadcast paths. (Depends: T024, T025, T014)
+✅ T063: Add load test scripts placeholder `server/tools/load/` simulating 200 concurrent arena users. (Depends: T023)
 
 ### Docs & Quickstart Updates
-T064: Update `quickstart.md` with real server run instructions & sample curl + ws client script. (Depends: T056, T057)
-T065: Add README section for backend setup `server/README.md`. (Depends: T056)
+✅ T064: Update `quickstart.md` with real server run instructions & sample curl + ws client script. (Depends: T056, T057)
+✅ T065: Add README section for backend setup `server/README.md`. (Depends: T056)
 
 ### Polish & Hardening
-T066 [P]: Add input validation (zod) enforcement in all HTTP routes. (Depends: T028-T031)
-T067 [P]: Add schema version negotiation test `tests/integration/protocol.version.spec.ts`. (FR-005 evolution readiness)
-T068 [P]: Security pass: ensure no secrets in logs & rate limit errors sanitized. (Depends: T015, T028)
-T069 [P]: Purge job scheduling & test harness `tests/integration/purge.jobs.spec.ts`. (Depends: T033, T034)
-T070: Final audit & cleanup - ensure all FRs map to code + tests matrix document `specs/003-server/traceability.md`.
+✅ T066 [P]: Add input validation (zod) enforcement in all HTTP routes. (Depends: T028-T031)
+✅ T067 [P]: Add schema version negotiation test `tests/integration/protocol.version.spec.ts`. (FR-005 evolution readiness)
+✅ T068 [P]: Security pass: ensure no secrets in logs & rate limit errors sanitized. (Depends: T015, T028)
+✅ T069 [P]: Purge job scheduling & test harness `tests/integration/purge.jobs.spec.ts`. (Depends: T033, T034)
+✅ T070: Final audit & cleanup - ensure all FRs map to code + tests matrix document `specs/003-server/traceability.md`.
 
 ## Parallelization Guidance
 - After T010 completes, T011 + T012 + (T014,T015) can proceed in parallel.
@@ -134,7 +134,7 @@ T070: Final audit & cleanup - ensure all FRs map to code + tests matrix document
 - FR-011: T017, T024, T029
 - FR-012: T013, T050
 - FR-013: T014, T062
-- FR-014: T035, T059
+- FR-014: T035, T059 
 - FR-015: T036, T060
 - FR-016: T037, T038, T061, T052
 - FR-017: T009, T019, T032, T049, T055

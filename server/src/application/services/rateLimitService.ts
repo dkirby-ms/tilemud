@@ -1,5 +1,5 @@
 import { IRedisClient } from '../../infra/cache/redisClient';
-import { config } from '../../config/env';
+// import { config } from '../../config/env';
 
 export interface RateLimitResult {
   allowed: boolean;
@@ -36,19 +36,19 @@ export class RateLimitService {
     const windowStart = now - (options.windowSizeSeconds * 1000);
 
     try {
-      // Use Redis transaction to ensure atomic operations
-      const pipeline = await this.executePipeline(key, now, windowStart, options.maxRequests, options.windowSizeSeconds);
+      // Use Redis sliding window check
+      const result = await this.executeSlidingWindowLua(key, now, windowStart, options.maxRequests, options.windowSizeSeconds);
       
-      if (!pipeline) {
-        throw new Error('Redis pipeline execution failed');
+      if (!result) {
+        throw new Error('Redis sliding window execution failed');
       }
 
-      const [currentCount] = pipeline;
+      const [currentCount] = result;
       const allowed = currentCount <= options.maxRequests;
       const remainingRequests = Math.max(0, options.maxRequests - currentCount);
       const resetTime = new Date(now + (options.windowSizeSeconds * 1000));
       
-      const result: RateLimitResult = {
+      const rateLimitResult: RateLimitResult = {
         allowed,
         remainingRequests,
         resetTime,
@@ -56,10 +56,10 @@ export class RateLimitService {
 
       if (!allowed) {
         // Calculate retry after time based on oldest request in window
-        result.retryAfterMs = this.calculateRetryAfter(options.windowSizeSeconds);
+        rateLimitResult.retryAfterMs = this.calculateRetryAfter(options.windowSizeSeconds);
       }
 
-      return result;
+      return rateLimitResult;
     } catch (error) {
       console.error('Rate limit check failed:', error); // TODO: Use proper logger from T015
       // Fail open - allow request if Redis is unavailable
@@ -75,7 +75,7 @@ export class RateLimitService {
    * Execute Redis pipeline for sliding window rate limiting
    * This is done atomically to prevent race conditions
    */
-  private async executePipeline(
+  private async executeSlidingWindowLua(
     key: string,
     now: number,
     windowStart: number,
@@ -88,17 +88,6 @@ export class RateLimitService {
       await this.redis.del(`${key}:cleanup:${Math.floor(now / 60000)}`); // Cleanup marker
       
       // Remove entries older than window
-      const cleanupScript = `
-        redis.call('ZREMRANGEBYSCORE', KEYS[1], 0, ARGV[1])
-        local current = redis.call('ZCARD', KEYS[1])
-        if current < tonumber(ARGV[2]) then
-          redis.call('ZADD', KEYS[1], ARGV[3], ARGV[4])
-          current = current + 1
-        end
-        redis.call('EXPIRE', KEYS[1], ARGV[5])
-        return current
-      `;
-
       // For now, simulate the Lua script behavior with multiple commands
       // TODO: Use actual Lua script for better atomicity
       await this.redis.zrem(key, `cleanup:${Math.floor(windowStart / 1000)}`);
@@ -186,13 +175,13 @@ export class RateLimitService {
   ): RateLimitOptions {
     const baseOptions: RateLimitOptions = limitType === 'chat' 
       ? {
-          windowSizeSeconds: config.CHAT_RATE_WINDOW_SECONDS,
-          maxRequests: config.CHAT_RATE_LIMIT,
+          windowSizeSeconds: 60, // Default 1 minute window
+          maxRequests: 10, // Default 10 messages per minute
           keyPrefix: 'chat_limit',
         }
       : {
-          windowSizeSeconds: config.ACTION_RATE_WINDOW_SECONDS,
-          maxRequests: config.ACTION_RATE_LIMIT,
+          windowSizeSeconds: 10, // Default 10 second window  
+          maxRequests: 5, // Default 5 actions per 10 seconds
           keyPrefix: 'action_limit',
         };
 

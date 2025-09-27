@@ -100,9 +100,12 @@ export async function registerAuthRoutes(fastify: FastifyInstance) {
     },
   }, async (request: FastifyRequest<{ Body: AuthSessionRequest }>, reply: FastifyReply) => {
     const startTime = Date.now();
-    const { token, playerDisplayName } = request.body;
 
     try {
+      // Validate request body with Zod
+      const validatedBody = AuthSessionRequestSchema.parse(request.body);
+      const { token, playerDisplayName } = validatedBody;
+
       // Validate and sanitize input
       const authInput: AuthTokenInput = {
         token: token.trim(),
@@ -168,6 +171,27 @@ export async function registerAuthRoutes(fastify: FastifyInstance) {
     } catch (error) {
       const processingTime = Date.now() - startTime;
       
+      // Handle Zod validation errors
+      if (error instanceof z.ZodError) {
+        logger.warn({
+          event: 'auth_validation_error',
+          validationErrors: error.issues.map(issue => ({
+            field: issue.path.join('.'),
+            message: issue.message,
+            code: issue.code,
+          })),
+          processingTimeMs: processingTime,
+        }, 'Authentication request validation failed');
+
+        const validationResponse: ErrorResponse = {
+          error: 'Invalid request format',
+          code: 'VALIDATION_ERROR',
+          details: error.issues,
+        };
+
+        return reply.code(400).send(validationResponse);
+      }
+
       logger.error({
         event: 'auth_error',
         error: error instanceof Error ? error.message : 'Unknown error',

@@ -3,10 +3,20 @@ import { Schema, MapSchema, type } from '@colyseus/schema';
 import { createServiceLogger } from '../../infra/monitoring/logger';
 import { 
   recordPlayerAction, 
-  updatePlayerCount 
+  updatePlayerCount,
+  recordTileTickDuration,
+  recordConflictResolution,
+  recordBroadcast
 } from '../../infra/monitoring/metrics';
 import { createSoftFailMonitor, SoftFailMonitor } from '../../application/services/softFailMonitor';
 import { createRuleConfigService, RuleConfigService, RuleVersionStamp } from '../../application/services/ruleConfigService';
+import { ChatDeliveryDispatcher } from '../../application/services/chatDeliveryDispatcher';
+import { BlockListMiddleware } from '../../application/middleware/blockList';
+import { PostgresPlayersRepository } from '../../infra/persistence/playersRepository';
+import { ModerationService } from '../../application/services/moderationService';
+import { PostgresGuildsRepository } from '../../infra/persistence/guildsRepository';
+import { PostgresReplayRepository } from '../../infra/persistence/replayRepository';
+import { ReplayWriter } from '../../application/services/replayWriter';
 
 // Room state schemas
 
@@ -87,7 +97,10 @@ export class BattleRoom extends Room<BattleState> {
   private readonly softFailMonitor: SoftFailMonitor;
   private readonly ruleConfigService: RuleConfigService;
   // private readonly aiElasticityMonitor: AiElasticityMonitor;
-  // private readonly chatDeliveryDispatcher: ChatDeliveryDispatcher;
+  private readonly chatDeliveryDispatcher: ChatDeliveryDispatcher;
+  private readonly blockListMiddleware: BlockListMiddleware;
+  private readonly moderationService: ModerationService;
+  private readonly replayWriter: ReplayWriter;
 
   // Conflict batching - key difference from ArenaRoom
   private readonly conflictBatchQueue: Array<{
@@ -129,7 +142,21 @@ export class BattleRoom extends Room<BattleState> {
     this.softFailMonitor = createSoftFailMonitor(stubRepository);
     this.ruleConfigService = createRuleConfigService();
     // this.aiElasticityMonitor = createAiElasticityMonitor();
-    // this.chatDeliveryDispatcher = createChatDeliveryDispatcher();
+    
+    // Initialize block list and chat services
+    const playersRepo = new PostgresPlayersRepository({});
+    const guildsRepo = new PostgresGuildsRepository({});
+    this.blockListMiddleware = new BlockListMiddleware(playersRepo);
+    this.chatDeliveryDispatcher = new ChatDeliveryDispatcher(undefined, this.blockListMiddleware);
+    this.moderationService = new ModerationService(playersRepo, guildsRepo);
+
+    // Initialize replay writer
+    const replayRepository = new PostgresReplayRepository({});
+    this.replayWriter = new ReplayWriter(replayRepository, {
+      batchSize: 50,
+      flushIntervalMs: 3000,
+      maxBufferSize: 5000,
+    });
 
     this.roomLogger.info({
       event: 'battle_room_initialized',
@@ -153,6 +180,27 @@ export class BattleRoom extends Room<BattleState> {
     // Initialize rule configuration version stamping
     await this.initializeRuleVersion(options.ruleConfigVersion);
 
+    // Initialize replay recording
+    if (this.replayWriter) {
+      await this.replayWriter.initializeReplay(this.state.instanceId);
+      
+      // Record battle creation event
+      await this.replayWriter.appendEvent(this.state.instanceId, {
+        type: 'battle_created',
+        data: {
+          instanceId: this.state.instanceId,
+          battleType: this.state.battleType,
+          region: this.state.region,
+          maxClients: this.maxClients,
+          ruleConfigVersion: this.currentRuleStamp?.version,
+        },
+        metadata: {
+          roomId: this.roomId,
+          tick: 0,
+        },
+      });
+    }
+
     // Set max clients based on battle type
     this.maxClients = this.getMaxPlayersByType(this.state.battleType);
     
@@ -170,6 +218,9 @@ export class BattleRoom extends Room<BattleState> {
     this.onMessage('place_tile', this.handlePlaceTile.bind(this));
     this.onMessage('chat', this.handleChatMessage.bind(this));
     this.onMessage('ready', this.handlePlayerReady.bind(this));
+    this.onMessage('mute_player', this.handleMutePlayer.bind(this));
+    this.onMessage('unmute_player', this.handleUnmutePlayer.bind(this));
+    this.onMessage('kick_player', this.handleKickPlayer.bind(this));
 
     // Set up conflict batching interval
     this.setSimulationInterval(() => this.processBattleTick(), this.TICK_RATE_MS);
@@ -341,26 +392,47 @@ export class BattleRoom extends Room<BattleState> {
 
   private async handleChatMessage(client: Client, message: ChatMessage) {
     try {
-      // TODO: Fix chat delivery API
-      // await this.chatDeliveryDispatcher.deliverMessage({
-      //   senderId: client.id,
-      //   channelType: message.channelType,
-      //   content: message.message,
-      //   targetId: message.targetId,
-      //   instanceId: this.state.instanceId,
-      // });
-
-      // Broadcast to battle participants
-      if (message.channelType === 'battle') {
-        this.broadcast('chat_message', {
-          senderId: client.id,
-          senderName: this.state.players.get(client.id)?.displayName,
-          message: message.message,
-          timestamp: Date.now(),
-        });
+      const playerState = this.state.players.get(client.id);
+      if (!playerState || !playerState.isConnected) {
+        return;
       }
 
-      recordPlayerAction('chat_sent', this.state.instanceId, 'success');
+      // Create chat message for dispatcher
+      const chatMessage = {
+        id: crypto.randomUUID(),
+        senderId: client.id,
+        recipientId: message.targetId,
+        channelType: message.channelType === 'battle' ? 'arena' as const : 
+                    message.channelType === 'party' ? 'guild' as const : 
+                    'private' as const,
+        content: message.message,
+        timestamp: new Date(),
+        deliveryTier: 'at_least_once' as const,
+      };
+
+      // Send through chat dispatcher with block list checking
+      const result = await this.chatDeliveryDispatcher.sendMessage(chatMessage);
+      
+      if (result.success) {
+        // Broadcast to battle participants
+        if (message.channelType === 'battle') {
+          this.broadcast('chat_message', {
+            senderId: client.id,
+            senderName: playerState.displayName,
+            message: message.message,
+            timestamp: chatMessage.timestamp.getTime(),
+          });
+        }
+        recordPlayerAction('chat_sent', this.state.instanceId, 'success');
+      } else {
+        this.roomLogger.warn({
+          event: 'chat_blocked',
+          clientId: client.id,
+          error: result.error,
+        }, `Chat message blocked: ${result.error}`);
+        
+        recordPlayerAction('chat_sent', this.state.instanceId, 'failure');
+      }
 
     } catch (error) {
       this.roomLogger.error({
@@ -386,6 +458,148 @@ export class BattleRoom extends Room<BattleState> {
 
       // Check if battle can start
       await this.checkBattleStart();
+    }
+  }
+
+  // Moderation handlers
+
+  private async handleMutePlayer(client: Client, message: { targetPlayerId: string; durationMs?: number; reason?: string }) {
+    try {
+      const moderatorPlayer = this.state.players.get(client.id);
+      if (!moderatorPlayer) {
+        return;
+      }
+
+      const result = await this.moderationService.mutePlayer({
+        moderatorId: client.id,
+        targetPlayerId: message.targetPlayerId,
+        durationMs: message.durationMs || 5 * 60 * 1000, // Default 5 minutes
+        reason: message.reason || 'Battle moderation',
+        scope: 'arena', // Using arena scope for battles too
+        scopeId: this.state.instanceId,
+      });
+
+      if (result.success) {
+        this.broadcast('player_muted', {
+          targetPlayerId: message.targetPlayerId,
+          durationMs: message.durationMs || 5 * 60 * 1000,
+          reason: message.reason || 'Battle moderation',
+          moderatorId: client.id,
+        });
+
+        this.roomLogger.info({
+          event: 'player_muted',
+          moderatorId: client.id,
+          targetPlayerId: message.targetPlayerId,
+          durationMs: message.durationMs,
+          reason: message.reason,
+        }, `Player muted in battle: ${message.targetPlayerId}`);
+      } else {
+        client.send('moderation_error', { error: result.error });
+      }
+    } catch (error) {
+      this.roomLogger.error({
+        event: 'mute_error',
+        moderatorId: client.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }, 'Failed to mute player');
+      
+      client.send('moderation_error', { error: 'Failed to mute player' });
+    }
+  }
+
+  private async handleUnmutePlayer(client: Client, message: { targetPlayerId: string }) {
+    try {
+      const moderatorPlayer = this.state.players.get(client.id);
+      if (!moderatorPlayer) {
+        return;
+      }
+
+      const result = await this.moderationService.unmutePlayer({
+        moderatorId: client.id,
+        targetPlayerId: message.targetPlayerId,
+        scope: 'arena',
+        scopeId: this.state.instanceId,
+      });
+
+      if (result.success) {
+        this.broadcast('player_unmuted', {
+          targetPlayerId: message.targetPlayerId,
+          moderatorId: client.id,
+        });
+
+        this.roomLogger.info({
+          event: 'player_unmuted',
+          moderatorId: client.id,
+          targetPlayerId: message.targetPlayerId,
+        }, `Player unmuted in battle: ${message.targetPlayerId}`);
+      } else {
+        client.send('moderation_error', { error: result.error });
+      }
+    } catch (error) {
+      this.roomLogger.error({
+        event: 'unmute_error',
+        moderatorId: client.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }, 'Failed to unmute player');
+      
+      client.send('moderation_error', { error: 'Failed to unmute player' });
+    }
+  }
+
+  private async handleKickPlayer(client: Client, message: { targetPlayerId: string; reason?: string }) {
+    try {
+      const moderatorPlayer = this.state.players.get(client.id);
+      if (!moderatorPlayer) {
+        return;
+      }
+
+      const result = await this.moderationService.kickPlayer({
+        moderatorId: client.id,
+        targetPlayerId: message.targetPlayerId,
+        reason: message.reason || 'Battle moderation',
+        scope: 'arena',
+        scopeId: this.state.instanceId,
+      });
+
+      if (result.success) {
+        // Find and disconnect the target player
+        const targetClient = this.clients.find(c => c.id === message.targetPlayerId);
+        if (targetClient) {
+          targetClient.send('kicked_from_room', {
+            reason: message.reason || 'Battle moderation',
+            moderatorId: client.id,
+          });
+          
+          // Give them a moment to receive the message, then disconnect
+          setTimeout(() => {
+            targetClient.leave(1000); // Normal closure
+          }, 1000);
+        }
+
+        this.broadcast('player_kicked', {
+          targetPlayerId: message.targetPlayerId,
+          reason: message.reason || 'Battle moderation',
+          moderatorId: client.id,
+        });
+
+        this.roomLogger.info({
+          event: 'player_kicked',
+          moderatorId: client.id,
+          targetPlayerId: message.targetPlayerId,
+          reason: message.reason,
+        }, `Player kicked from battle: ${message.targetPlayerId}`);
+      } else {
+        client.send('moderation_error', { error: result.error });
+      }
+    } catch (error) {
+      this.roomLogger.error({
+        event: 'kick_error',
+        moderatorId: client.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }, 'Failed to kick player');
+      
+      client.send('moderation_error', { error: 'Failed to kick player' });
     }
   }
 
@@ -511,6 +725,9 @@ export class BattleRoom extends Room<BattleState> {
   private processConflictBatch() {
     if (this.conflictBatchQueue.length === 0) return;
 
+    const startTime = Date.now();
+    let conflictsResolved = 0;
+
     // Group by position for conflict resolution
     const positionGroups = new Map<string, Array<{
       client: Client;
@@ -545,6 +762,7 @@ export class BattleRoom extends Room<BattleState> {
         // Reject all attempts for occupied position
         for (const entry of conflictingEntries) {
           this.conflictCount++;
+          conflictsResolved++;
           entry.client.send('tile_rejected', {
             x: entry.message.x,
             y: entry.message.y,
@@ -575,6 +793,7 @@ export class BattleRoom extends Room<BattleState> {
         // Reject losers
         for (const loser of losers) {
           this.conflictCount++;
+          conflictsResolved++;
           loser.client.send('tile_rejected', {
             x: loser.message.x,
             y: loser.message.y,
@@ -586,11 +805,14 @@ export class BattleRoom extends Room<BattleState> {
 
     // Broadcast all successful placements in batch
     if (successfulPlacements.length > 0) {
+      const broadcastStartTime = Date.now();
       this.broadcast('tiles_updated', {
         tiles: successfulPlacements,
         tick: this.state.currentTick,
         conflictsResolved: this.conflictCount,
       });
+      const broadcastDuration = Date.now() - broadcastStartTime;
+      recordBroadcast(broadcastDuration, 'tiles_updated', this.clients.length);
 
       this.roomLogger.debug({
         event: 'batch_processed',
@@ -598,6 +820,14 @@ export class BattleRoom extends Room<BattleState> {
         conflictsCount: this.conflictCount,
         tick: this.state.currentTick,
       }, `Processed tile batch: ${successfulPlacements.length} placed, ${this.conflictCount} conflicts`);
+    }
+
+    // Record performance metrics
+    const totalDuration = Date.now() - startTime;
+    recordTileTickDuration(totalDuration, this.state.instanceId, this.clients.length);
+    
+    if (conflictsResolved > 0) {
+      recordConflictResolution(totalDuration, this.state.instanceId, conflictsResolved);
     }
   }
 

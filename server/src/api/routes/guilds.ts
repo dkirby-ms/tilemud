@@ -18,7 +18,7 @@ const CreateGuildResponseSchema = z.object({
   createdAt: z.string(),
   memberCount: z.number(),
 });
-
+ 
 const ErrorResponseSchema = z.object({
   error: z.string(),
   code: z.string().optional(),

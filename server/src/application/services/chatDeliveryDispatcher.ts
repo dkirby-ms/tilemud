@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { createServiceLogger } from '../../infra/monitoring/logger';
 import { recordChatMessage, chatMessagesTotal } from '../../infra/monitoring/metrics';
+import { BlockListMiddleware, BlockCheckResult } from '../middleware/blockList';
 
 // Chat delivery schemas
 export const MessageDeliveryTierSchema = z.enum(['exactly_once', 'at_least_once', 'best_effort']);
@@ -98,7 +99,8 @@ export class ChatDeliveryDispatcher {
   };
 
   constructor(
-    private readonly config: DeliveryGuaranteeConfig = DeliveryGuaranteeConfigSchema.parse({})
+    private readonly config: DeliveryGuaranteeConfig = DeliveryGuaranteeConfigSchema.parse({}),
+    private readonly blockListMiddleware?: BlockListMiddleware
   ) {
     // Start background retry processor
     this.startRetryProcessor();
@@ -122,6 +124,31 @@ export class ChatDeliveryDispatcher {
         deliveryTier: validMessage.deliveryTier,
         recipientId: validMessage.recipientId,
       }, `Sending message ${validMessage.id}`);
+
+      // Check block list for private messages
+      if (validMessage.recipientId && this.blockListMiddleware) {
+        const blockCheck: BlockCheckResult = await this.blockListMiddleware.checkBlock(
+          validMessage.senderId,
+          validMessage.recipientId
+        );
+        
+        if (blockCheck.blocked) {
+          this.serviceLogger.warn({
+            event: 'message_blocked',
+            messageId: validMessage.id,
+            senderId: validMessage.senderId,
+            recipientId: validMessage.recipientId,
+            reason: blockCheck.reason,
+            blockedBy: blockCheck.blockedBy,
+          }, `Message blocked: ${blockCheck.reason || 'User blocked'}`);
+          
+          return { 
+            success: false, 
+            messageId: validMessage.id, 
+            error: 'Message blocked by recipient' 
+          };
+        }
+      }
 
       // Check for duplicates in exactly-once tier
       if (validMessage.deliveryTier === 'exactly_once') {

@@ -3,7 +3,8 @@ import { IGuildsRepository } from '../../infra/persistence/guildsRepository';
 import { IPlayersRepository } from '../../infra/persistence/playersRepository';
 import { createServiceLogger } from '../../infra/monitoring/logger';
 import { Player } from '../../domain/entities/players';
-import { Guild } from '../../domain/entities/guilds';
+// import { Guild } from '../../domain/entities/guilds';
+// import { ChatMessage } from '../../domain/entities/chat';
 
 // Moderation action types
 export const ModerationAction = {

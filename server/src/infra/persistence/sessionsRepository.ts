@@ -36,6 +36,7 @@ export interface ISessionsRepository {
 
 // Basic Postgres implementation stub
 export class PostgresSessionsRepository implements ISessionsRepository {
+  // @ts-ignore - Intentionally unused parameter for implementation stub
   constructor(private readonly _db: unknown) {} // TODO: Replace with proper DB client type
 
   async findInstanceById(_id: string): Promise<Instance | null> {

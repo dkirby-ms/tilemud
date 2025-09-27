@@ -43,6 +43,7 @@ export interface IChatRepository {
 
 // Basic Postgres implementation stub
 export class PostgresChatRepository implements IChatRepository {
+  // @ts-ignore - Intentionally unused parameter for implementation stub
   constructor(private readonly _db: unknown) {} // TODO: Replace with proper DB client type
 
   async findChannelById(_id: string): Promise<ChatChannel | null> {

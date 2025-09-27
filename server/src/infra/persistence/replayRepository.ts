@@ -37,6 +37,7 @@ export interface IReplayRepository {
 
 // Basic Postgres implementation stub
 export class PostgresReplayRepository implements IReplayRepository {
+  // @ts-ignore - Intentionally unused parameter for implementation stub
   constructor(private readonly _db: unknown) {} // TODO: Replace with proper DB client type
 
   async findReplayById(_id: string): Promise<ReplayMetadata | null> {

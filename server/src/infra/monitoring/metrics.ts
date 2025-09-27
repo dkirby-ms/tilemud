@@ -80,6 +80,13 @@ export const conflictResolutionDuration = new Histogram({
   buckets: [5, 10, 25, 50, 100, 200, 500], // ≤100ms target
 });
 
+export const broadcastDuration = new Histogram({
+  name: 'broadcast_duration_ms',
+  help: 'Duration of message broadcast to all clients in room',
+  labelNames: ['message_type', 'client_count_bucket'] as const,
+  buckets: [1, 5, 10, 25, 50, 100, 200, 500], // Target <50ms for most broadcasts
+});
+
 export const dbQueryDuration = new Histogram({
   name: 'db_query_duration_ms',
   help: 'Database query execution time',
@@ -182,6 +189,11 @@ export function recordArenaJoin(durationMs: number, arenaTier: string, queuePosi
 export function recordConflictResolution(durationMs: number, arenaId: string, conflictCount: number): void {
   const conflictBucket = conflictCount <= 1 ? 'single' : conflictCount <= 5 ? 'few' : 'many';
   conflictResolutionDuration.observe({ arena_id: arenaId, conflict_count: conflictBucket }, durationMs);
+}
+
+export function recordBroadcast(durationMs: number, messageType: string, clientCount: number): void {
+  const clientBucket = clientCount <= 10 ? 'small' : clientCount <= 50 ? 'medium' : 'large';
+  broadcastDuration.observe({ message_type: messageType, client_count_bucket: clientBucket }, durationMs);
 }
 
 export function recordDbQuery(durationMs: number, operation: string, table: string): void {
