@@ -64,7 +64,8 @@ export class GuildService {
 
   // Guild configuration
   private readonly MAX_GUILD_MEMBERS = 1000;
-  private readonly GUILD_NAME_RESERVATION_TIME_MS = 5 * 60 * 1000; // 5 minutes
+  // Guild name reservation time (reserved for future reservation feature)
+  // private readonly GUILD_NAME_RESERVATION_TIME_MS = 5 * 60 * 1000; // 5 minutes
 
   constructor(
     private readonly guildsRepo: IGuildsRepository,

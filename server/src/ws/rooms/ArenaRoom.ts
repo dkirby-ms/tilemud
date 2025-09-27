@@ -10,6 +10,7 @@ import { createSoftFailMonitor, SoftFailMonitor } from '../../application/servic
 import { createAiElasticityMonitor, AiElasticityMonitor } from '../../application/services/aiElasticityMonitor';
 import { createChatDeliveryDispatcher, ChatDeliveryDispatcher } from '../../application/services/chatDeliveryDispatcher';
 import { PostgresSessionsRepository, ISessionsRepository } from '../../infra/persistence/sessionsRepository';
+import { createRuleConfigService, RuleConfigService, RuleVersionStamp } from '../../application/services/ruleConfigService';
 
 // Room state schemas
 export class TileState extends Schema {
@@ -38,6 +39,7 @@ export class ArenaState extends Schema {
   @type("number") currentTick!: number;
   @type("boolean") isActive!: boolean;
   @type("number") startTime!: number;
+  @type("string") ruleConfigVersion!: string;
 }
 
 interface ArenaOptions {
@@ -80,6 +82,7 @@ export class ArenaRoom extends Room<ArenaState> {
   private readonly aiElasticityMonitor: AiElasticityMonitor;
   private readonly chatDispatcher: ChatDeliveryDispatcher;
   private readonly sessionsRepo: ISessionsRepository;
+  private readonly ruleConfigService: RuleConfigService;
 
   // Room configuration
   private readonly MAX_TILES_PER_PLAYER = 100;
@@ -91,6 +94,9 @@ export class ArenaRoom extends Room<ArenaState> {
   // Performance tracking
   private conflictCount = 0;
 
+  // Rule version tracking
+  private currentRuleStamp?: RuleVersionStamp;
+
   constructor() {
     super();
     
@@ -99,9 +105,10 @@ export class ArenaRoom extends Room<ArenaState> {
     this.softFailMonitor = createSoftFailMonitor(this.sessionsRepo);
     this.aiElasticityMonitor = createAiElasticityMonitor();
     this.chatDispatcher = createChatDeliveryDispatcher();
+    this.ruleConfigService = createRuleConfigService();
   }
 
-  override onCreate(options: ArenaOptions = {}) {
+  override async onCreate(options: ArenaOptions = {}) {
     this.roomLogger.info({
       event: 'arena_room_created',
       roomId: this.roomId,
@@ -118,12 +125,16 @@ export class ArenaRoom extends Room<ArenaState> {
     this.state.isActive = false;
     this.state.startTime = Date.now();
 
+    // Initialize rule configuration version stamping
+    await this.initializeRuleVersion();
+
     // Set room metadata
     this.setMetadata({
       arenaId: this.state.arenaId,
       tier: this.state.tier,
       maxPlayers: this.state.maxPlayers,
       region: options.region || 'default',
+      ruleConfigVersion: this.state.ruleConfigVersion,
     });
 
     // Configure room settings
@@ -654,5 +665,49 @@ export class ArenaRoom extends Room<ArenaState> {
   private isValidTilePosition(x: number, y: number): boolean {
     // Basic bounds checking (would be more sophisticated in production)
     return x >= -1000 && x <= 1000 && y >= -1000 && y <= 1000;
+  }
+
+  /**
+   * Initialize rule configuration version stamping for the arena
+   */
+  private async initializeRuleVersion(): Promise<void> {
+    try {
+      const arenaRuleConfig = await this.ruleConfigService.getActiveRuleConfig('arena');
+      
+      if (arenaRuleConfig) {
+        this.currentRuleStamp = this.ruleConfigService.createVersionStamp(arenaRuleConfig);
+        this.state.ruleConfigVersion = arenaRuleConfig.version;
+        
+        this.roomLogger.info({
+          event: 'arena_rule_version_initialized',
+          ruleConfigId: arenaRuleConfig.id,
+          version: arenaRuleConfig.version,
+          stamp: this.currentRuleStamp,
+        }, `Arena rule version initialized: ${arenaRuleConfig.name} v${arenaRuleConfig.version}`);
+      } else {
+        // Fallback to default version
+        this.state.ruleConfigVersion = '1.0.0';
+        
+        this.roomLogger.warn({
+          event: 'arena_rule_version_fallback',
+          fallbackVersion: this.state.ruleConfigVersion,
+        }, 'No active arena rule config found, using fallback version');
+      }
+    } catch (error) {
+      this.state.ruleConfigVersion = '1.0.0';
+      
+      this.roomLogger.error({
+        event: 'arena_rule_version_init_error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        fallbackVersion: this.state.ruleConfigVersion,
+      }, 'Failed to initialize arena rule version');
+    }
+  }
+
+  /**
+   * Get the current rule version stamp for audit purposes
+   */
+  getCurrentRuleStamp(): RuleVersionStamp | undefined {
+    return this.currentRuleStamp;
   }
 }

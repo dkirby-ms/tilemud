@@ -65,18 +65,18 @@ T033: ✅ Implement replay purge job (cron / interval) `application/jobs/replayP
 T034 ✅: Implement chat retention purge job `application/jobs/chatRetentionJob.ts`. (Depends: T022)
 
 ### Moderation & Social
-T035: Implement block list enforcement middleware for incoming chat / direct messages `application/middleware/blockList.ts` (FR-014). (Depends: T011)
-T036: Implement administrative moderation commands service `application/services/moderationService.ts` (mute, kick, guild dissolution) (FR-015). (Depends: T011)
+T035 ✅: Implement block list enforcement middleware for incoming chat / direct messages `application/middleware/blockList.ts` (FR-014). (Depends: T011)
+T036 ✅: Implement administrative moderation commands service `application/services/moderationService.ts` (mute, kick, guild dissolution) (FR-015). (Depends: T011)
 
 ### Rule Config & Audit
-T037: Implement rule config version loader & audit logger `application/services/ruleConfigService.ts` (FR-016). (Depends: T011)
-T038: Integrate rule version stamping into room resolution flows (modify ArenaRoom & BattleRoom). (Depends: T037, T024, T025)
+T037 ✅: Implement rule config version loader & audit logger `application/services/ruleConfigService.ts` (FR-016). (Depends: T011)
+T038 ✅: Integrate rule version stamping into room resolution flows (modify ArenaRoom & BattleRoom). (Depends: T037, T024, T025)
 
 ### Tests (Contract / Unit / Integration) – Written Before Implementations Where Possible
-T039 [P]: Contract test for POST /auth/session (happy + invalid token) `tests/contract/auth.session.spec.ts`. (FR-009)
-T040 [P]: Contract test for GET /arenas `tests/contract/arenas.get.spec.ts`. (FR-002, FR-011)
-T041 [P]: Contract test for POST /guilds `tests/contract/guilds.post.spec.ts`. (FR-006)
-T042 [P]: Contract test for GET /replays/:id `tests/contract/replays.get.spec.ts`. (FR-017)
+✅ T039 [P]: Contract test for POST /auth/session (happy + invalid token) `tests/contract/auth.session.spec.ts`. (FR-009)
+✅ T040 [P]: Contract test for GET /arenas `tests/contract/arenas.get.spec.ts`. (FR-002, FR-011)
+✅ T041 [P]: Contract test for POST /guilds `tests/contract/guilds.post.spec.ts`. (FR-006)
+✅ T042 [P]: Contract test for GET /replays/:id `tests/contract/replays.get.spec.ts`. (FR-017)
 T043 [P]: WS integration test for arena join & tile placement batch resolution `tests/integration/arena.tilePlacement.spec.ts`. (FR-002, FR-005)
 T044 [P]: WS integration test for reconnect within grace period `tests/integration/reconnect.grace.spec.ts`. (FR-009)
 T045 [P]: WS integration test for AI elasticity reduction trigger `tests/integration/ai.elasticity.spec.ts`. (FR-004)
@@ -92,8 +92,8 @@ T054 [P]: Unit tests for AI elasticity monitor thresholds `tests/unit/aiElastici
 T055 [P]: Unit tests for replay writer sequence integrity `tests/unit/replayWriter.spec.ts`. (FR-017)
 
 ### Integration & Wiring
-T056: Wire HTTP routes into main express/fastify server (choose framework) `src/api/server.ts`. (Depends: T028-T031)
-T057: Implement bootstrap script `src/bootstrap/dev.ts` starting DB/Redis connections, HTTP, Colyseus. (Depends: T023, T028)
+✅ T056: Wire HTTP routes into main express/fastify server (choose framework) `src/api/server.ts`. (Depends: T028-T031)
+✅ T057: Implement bootstrap script `src/bootstrap/dev.ts` starting DB/Redis connections, HTTP, Colyseus. (Depends: T023, T028)
 T058: Integrate metrics endpoint `/metrics` & health checks `src/api/routes/health.ts`. (Depends: T014, T056)
 T059: Add block list middleware integration at chat dispatcher & room joins. (Depends: T035, T024, T025)
 T060: Integrate moderation commands (mute/kick) into ArenaRoom & BattleRoom handlers. (Depends: T036, T024, T025)

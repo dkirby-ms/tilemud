@@ -1,25 +1,11 @@
 import { Server, LobbyRoom } from 'colyseus';
 import { createServer } from 'http';
-import fastify from 'fastify';
-import cors from '@fastify/cors';
 
 import { config } from '../config/env';
 import { createServiceLogger } from '../infra/monitoring/logger';
-import { getMetricsText } from '../infra/monitoring/metrics';
-import { createRedisClient } from '../infra/cache/redisClient';
+import { buildApp } from '../api/server';
 
 const serverLogger = createServiceLogger('ColyseusServer');
-
-interface HealthStatus {
-  status: string;
-  timestamp: string;
-  uptime: number;
-  memory: NodeJS.MemoryUsage;
-  colyseus: {
-    processId: number;
-  };
-  redis?: string;
-}
 
 /**
  * Bootstrap and configure the Colyseus server with HTTP endpoints
@@ -34,73 +20,18 @@ export async function createColyseusServer(): Promise<{ gameServer: Server; http
       server: httpServer,
     });
 
-    // Create Fastify app for HTTP routes (separate from WebSocket)
-    const app = fastify({
+    // Create HTTP API server with all routes integrated
+    const app = buildApp({
       logger: false, // We use Pino directly
     });
 
-    // Configure CORS
-    await app.register(cors, {
-      origin: true, // Allow all origins for development
-      credentials: true,
-    });
+    // Configure CORS (already handled in buildApp)
+    // Additional health and metrics endpoints are in buildApp
 
-    // Health check endpoint
-    app.get('/health', async (_request, reply) => {
-      try {
-        // Basic health check
-        const health: HealthStatus = {
-          status: 'healthy',
-          timestamp: new Date().toISOString(),
-          uptime: process.uptime(),
-          memory: process.memoryUsage(),
-          colyseus: {
-            processId: process.pid,
-          },
-        };
-
-        // Test Redis connection if available
-        try {
-          const redis = await createRedisClient();
-          await redis.ping();
-          health.redis = 'connected';
-          redis.disconnect();
-        } catch (error) {
-          health.redis = 'disconnected';
-          serverLogger.warn({
-            event: 'redis_health_check_failed',
-            error: error instanceof Error ? error.message : 'Unknown error',
-          }, 'Redis health check failed during server health check');
-        }
-
-        return health;
-      } catch (error) {
-        serverLogger.error({
-          event: 'health_check_error',
-          error: error instanceof Error ? error.message : 'Unknown error',
-        }, 'Health check failed');
-
-        reply.code(500);
-        return { status: 'unhealthy', error: 'Internal health check failed' };
-      }
-    });
-
-    // Prometheus metrics endpoint
-    app.get('/metrics', async (_request, reply) => {
-      try {
-        const metrics = await getMetricsText();
-        reply.type('text/plain; version=0.0.4; charset=utf-8');
-        return metrics;
-      } catch (error) {
-        serverLogger.error({
-          event: 'metrics_endpoint_error',
-          error: error instanceof Error ? error.message : 'Unknown error',
-        }, 'Metrics endpoint failed');
-
-        reply.code(500);
-        return 'Error generating metrics';
-      }
-    });
+    serverLogger.info({
+      event: 'http_api_server_configured',
+      endpoints: ['/health', '/metrics', '/auth/session', '/arenas', '/guilds', '/replays/:id'],
+    }, 'HTTP API server configured with all routes');
 
     // Colyseus Monitor (development only) - skip for now due to Fastify incompatibility
     if (config.NODE_ENV === 'development') {

@@ -6,6 +6,7 @@ import {
   updatePlayerCount 
 } from '../../infra/monitoring/metrics';
 import { createSoftFailMonitor, SoftFailMonitor } from '../../application/services/softFailMonitor';
+import { createRuleConfigService, RuleConfigService, RuleVersionStamp } from '../../application/services/ruleConfigService';
 
 // Room state schemas
 
@@ -84,6 +85,7 @@ export class BattleRoom extends Room<BattleState> {
 
   // Service dependencies
   private readonly softFailMonitor: SoftFailMonitor;
+  private readonly ruleConfigService: RuleConfigService;
   // private readonly aiElasticityMonitor: AiElasticityMonitor;
   // private readonly chatDeliveryDispatcher: ChatDeliveryDispatcher;
 
@@ -97,6 +99,9 @@ export class BattleRoom extends Room<BattleState> {
   // Performance tracking
   private conflictCount = 0;
   private battleTimer: NodeJS.Timeout | undefined;
+
+  // Rule version tracking
+  private currentRuleStamp?: RuleVersionStamp;
 
   constructor() {
     super();
@@ -122,6 +127,7 @@ export class BattleRoom extends Room<BattleState> {
     } as any;
 
     this.softFailMonitor = createSoftFailMonitor(stubRepository);
+    this.ruleConfigService = createRuleConfigService();
     // this.aiElasticityMonitor = createAiElasticityMonitor();
     // this.chatDeliveryDispatcher = createChatDeliveryDispatcher();
 
@@ -143,7 +149,9 @@ export class BattleRoom extends Room<BattleState> {
     this.state.battleType = options.battleType || 'small';
     this.state.region = options.region || 'us-east-1';
     this.state.shardKey = options.shardKey || `battle|${this.state.region}|${this.roomId}`;
-    this.state.ruleConfigVersion = options.ruleConfigVersion || '1.0.0';
+
+    // Initialize rule configuration version stamping
+    await this.initializeRuleVersion(options.ruleConfigVersion);
 
     // Set max clients based on battle type
     this.maxClients = this.getMaxPlayersByType(this.state.battleType);
@@ -154,6 +162,7 @@ export class BattleRoom extends Room<BattleState> {
       battleType: this.state.battleType,
       maxClients: this.maxClients,
       region: this.state.region,
+      ruleConfigVersion: this.state.ruleConfigVersion,
     }, `Battle configured: ${this.state.battleType} (max ${this.maxClients} players)`);
 
     // Set up message handlers using Colyseus onMessage pattern
@@ -694,13 +703,16 @@ export class BattleRoom extends Room<BattleState> {
       finalPlayerCount: this.clients.length,
       totalTicks: this.state.currentTick,
       duration: this.state.resolvedAt - (this.state.startedAt || 0),
-    }, `Battle resolved: ${reason}`);
+      ruleConfigVersion: this.state.ruleConfigVersion,
+      ruleStamp: this.currentRuleStamp,
+    }, `Battle resolved: ${reason} with rule version ${this.state.ruleConfigVersion}`);
 
     // Broadcast resolution to all players
     this.broadcast('battle_resolved', {
       instanceId: this.state.instanceId,
       reason,
       finalTick: this.state.currentTick,
+      ruleConfigVersion: this.state.ruleConfigVersion,
     });
 
     // Clear battle timer
@@ -727,5 +739,61 @@ export class BattleRoom extends Room<BattleState> {
   private isValidTilePosition(x: number, y: number): boolean {
     // Battle-specific bounds (smaller than arena)
     return x >= -100 && x <= 100 && y >= -100 && y <= 100;
+  }
+
+  /**
+   * Initialize rule configuration version stamping for the battle
+   */
+  private async initializeRuleVersion(providedVersion?: string): Promise<void> {
+    try {
+      if (providedVersion) {
+        // Use provided version (for testing or specific battle configurations)
+        this.state.ruleConfigVersion = providedVersion;
+        
+        this.roomLogger.info({
+          event: 'battle_rule_version_provided',
+          providedVersion: providedVersion,
+        }, `Battle rule version set from options: ${providedVersion}`);
+        return;
+      }
+
+      // Get active battle rule configuration
+      const battleRuleConfig = await this.ruleConfigService.getActiveRuleConfig('battle');
+      
+      if (battleRuleConfig) {
+        this.currentRuleStamp = this.ruleConfigService.createVersionStamp(battleRuleConfig);
+        this.state.ruleConfigVersion = battleRuleConfig.version;
+        
+        this.roomLogger.info({
+          event: 'battle_rule_version_initialized',
+          ruleConfigId: battleRuleConfig.id,
+          version: battleRuleConfig.version,
+          stamp: this.currentRuleStamp,
+        }, `Battle rule version initialized: ${battleRuleConfig.name} v${battleRuleConfig.version}`);
+      } else {
+        // Fallback to default version
+        this.state.ruleConfigVersion = '1.0.0';
+        
+        this.roomLogger.warn({
+          event: 'battle_rule_version_fallback',
+          fallbackVersion: this.state.ruleConfigVersion,
+        }, 'No active battle rule config found, using fallback version');
+      }
+    } catch (error) {
+      this.state.ruleConfigVersion = '1.0.0';
+      
+      this.roomLogger.error({
+        event: 'battle_rule_version_init_error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        fallbackVersion: this.state.ruleConfigVersion,
+      }, 'Failed to initialize battle rule version');
+    }
+  }
+
+  /**
+   * Get the current rule version stamp for audit purposes
+   */
+  getCurrentRuleStamp(): RuleVersionStamp | undefined {
+    return this.currentRuleStamp;
   }
 }
