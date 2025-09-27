@@ -41,7 +41,7 @@ T013: Implement rate limiter service `application/services/rateLimitService.ts` 
 ✅ T016: Implement auth ticket issuance service `application/services/authService.ts` validating input token (mock) and producing session ticket (FR-009 handshake). (Depends: T011)
 ✅ T017: Implement arena catalog service `application/services/arenaCatalogService.ts` computing utilization & capacity tiers (FR-002, FR-011). (Depends: T011)
 ✅ T018: Implement guild creation service `application/services/guildService.ts` enforcing uniqueness & reservation (FR-006). (Depends: T011)
-T019: Implement replay metadata retrieval service `application/services/replayService.ts`. (FR-017) (Depends: T011)
+✅ T019: Implement replay metadata retrieval service `application/services/replayService.ts`. (FR-017) (Depends: T011)
 T020: Implement soft-fail detection monitor `application/services/softFailMonitor.ts` for quorum tracking (FR-018). (Depends: T011)
 T021: Implement AI elasticity monitor `application/services/aiElasticityMonitor.ts` applying rules from FR-004. (Depends: T011)
 T022: Implement chat delivery dispatcher `application/services/chatDispatcher.ts` distinguishing tiered guarantees (FR-007). (Depends: T011, T013)
