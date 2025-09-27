@@ -119,6 +119,25 @@ export const systemResourceUsage = new Gauge({
   labelNames: ['resource_type'] as const, // cpu, memory, disk
 });
 
+// Quorum and soft-fail monitoring
+export const playersQuorumStatus = new Gauge({
+  name: 'players_quorum_status',
+  help: 'Player quorum status by arena',
+  labelNames: ['arena_id', 'status'] as const, // responsive, unresponsive
+});
+
+export const arenasQuorumPercent = new Gauge({
+  name: 'arenas_quorum_percent',
+  help: 'Arena quorum percentage',
+  labelNames: ['arena_id'] as const,
+});
+
+export const softFailDecisions = new Counter({
+  name: 'soft_fail_decisions_total',
+  help: 'Total number of soft-fail decisions made',
+  labelNames: ['arena_id', 'decision'] as const, // continue, pause, abort, migrate
+});
+
 export const replayRetentionSize = new Gauge({
   name: 'replay_retention_size_bytes',
   help: 'Total size of replay data within retention period',
@@ -195,6 +214,20 @@ export function recordRateLimitHit(limitType: 'chat' | 'action', playerId: strin
 
 export function updateRateLimitQuota(limitType: 'chat' | 'action', playerId: string, remainingQuota: number): void {
   rateLimitRemainingQuota.set({ limit_type: limitType, player_id: playerId }, remainingQuota);
+}
+
+// Soft-fail monitoring helpers
+export function updatePlayerQuorumStatus(arenaId: string, responsiveCount: number, unresponsiveCount: number): void {
+  playersQuorumStatus.set({ arena_id: arenaId, status: 'responsive' }, responsiveCount);
+  playersQuorumStatus.set({ arena_id: arenaId, status: 'unresponsive' }, unresponsiveCount);
+}
+
+export function updateArenaQuorumPercent(arenaId: string, quorumPercent: number): void {
+  arenasQuorumPercent.set({ arena_id: arenaId }, quorumPercent);
+}
+
+export function recordSoftFailDecision(arenaId: string, decision: 'continue' | 'pause' | 'abort' | 'migrate'): void {
+  softFailDecisions.inc({ arena_id: arenaId, decision });
 }
 
 // Export the registry for /metrics endpoint
