@@ -94,7 +94,7 @@ T055 [P]: Unit tests for replay writer sequence integrity `tests/unit/replayWrit
 ### Integration & Wiring
 ✅ T056: Wire HTTP routes into main express/fastify server (choose framework) `src/api/server.ts`. (Depends: T028-T031)
 ✅ T057: Implement bootstrap script `src/bootstrap/dev.ts` starting DB/Redis connections, HTTP, Colyseus. (Depends: T023, T028)
-T058: Integrate metrics endpoint `/metrics` & health checks `src/api/routes/health.ts`. (Depends: T014, T056)
+✅ T058: Integrate metrics endpoint `/metrics` & health checks `src/api/routes/health.ts`. (Depends: T014, T056)
 T059: Add block list middleware integration at chat dispatcher & room joins. (Depends: T035, T024, T025)
 T060: Integrate moderation commands (mute/kick) into ArenaRoom & BattleRoom handlers. (Depends: T036, T024, T025)
 T061: Integrate replay writer & rule stamping into resolution flows. (Depends: T032, T038)
