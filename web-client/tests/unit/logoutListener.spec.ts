@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { renderHook } from '@testing-library/react';
+import { useLogoutListener } from '../../src/hooks/useLogoutListener';
 
 describe('Logout Listener', () => {
   let addEventListenerSpy: ReturnType<typeof vi.spyOn>;
@@ -14,8 +16,7 @@ describe('Logout Listener', () => {
   });
 
   it('should set up storage event listener', () => {
-    // TODO: Test that logout listener hook sets up storage event listener
-    // This will be implemented when we create the logout listener hook
+    renderHook(() => useLogoutListener());
     
     expect(addEventListenerSpy).toHaveBeenCalledWith(
       'storage',
@@ -53,7 +54,10 @@ describe('Logout Listener', () => {
   });
 
   it('should clean up listener on unmount', () => {
-    // TODO: Test cleanup of storage listener
+    const { unmount } = renderHook(() => useLogoutListener());
+    
+    unmount();
+    
     expect(removeEventListenerSpy).toHaveBeenCalledWith(
       'storage',
       expect.any(Function)

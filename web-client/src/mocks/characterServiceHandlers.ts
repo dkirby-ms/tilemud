@@ -18,6 +18,32 @@ function generateUUID(): string {
   });
 }
 
+// Helper to check if authentication should be required
+function shouldRequireAuthentication(request: Request, scenario: string | null): boolean {
+  const authHeader = request.headers.get('authorization');
+  if (authHeader) return false; // Already authenticated
+  
+  const isTestEnv = typeof global !== 'undefined' && global.process?.env?.NODE_ENV === 'test' ||
+                    typeof process !== 'undefined' && process.env.NODE_ENV === 'test' ||
+                    typeof import.meta.env.VITEST !== 'undefined';
+  
+  // In tests, only bypass auth if explicitly requested with 'no-auth-bypass' scenario
+  // In production, always require auth unless bypassed
+  return !isTestEnv || (isTestEnv && scenario !== 'no-auth-bypass');
+}
+
+// Helper to create authentication error response
+function createAuthError(): Response {
+  return HttpResponse.json(
+    {
+      service: 'character-service',
+      message: 'Authentication required.',
+      retryAfterSeconds: null,
+    } as ServiceOutage,
+    { status: 401 }
+  );
+}
+
 /**
  * Mock data for character service responses
  */
@@ -168,17 +194,9 @@ export const characterServiceHandlers = [
       return HttpResponse.json(outageNotice, { status: 503 });
     }
 
-    // Check for authentication header (unless explicitly bypassed or in dev mode)
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader && scenario !== 'no-auth-bypass' && import.meta.env.PROD) {
-      return HttpResponse.json(
-        {
-          service: 'character-service',
-          message: 'Authentication required.',
-          retryAfterSeconds: null,
-        } as ServiceOutage,
-        { status: 401 }
-      );
+    // Check for authentication header (unless explicitly bypassed)
+    if (shouldRequireAuthentication(request, scenario)) {
+      return createAuthError();
     }
 
     // Handle specific scenarios
@@ -234,17 +252,9 @@ export const characterServiceHandlers = [
       return HttpResponse.json(outageNotice, { status: 503 });
     }
 
-    // Check for authentication header (unless explicitly bypassed or in dev mode)
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader && scenario !== 'no-auth-bypass' && import.meta.env.PROD) {
-      return HttpResponse.json(
-        {
-          service: 'character-service',
-          message: 'Authentication required.',
-          retryAfterSeconds: null,
-        } as ServiceOutage,
-        { status: 401 }
-      );
+    // Check authentication
+    if (shouldRequireAuthentication(request, scenario)) {
+      return createAuthError();
     }
 
     // Check content type
@@ -392,17 +402,9 @@ export const characterServiceHandlers = [
       return HttpResponse.json(outageNotice, { status: 503 });
     }
 
-    // Check for authentication header (unless explicitly bypassed or in dev mode)
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader && scenario !== 'no-auth-bypass' && import.meta.env.PROD) {
-      return HttpResponse.json(
-        {
-          service: 'character-service',
-          message: 'Authentication required.',
-          retryAfterSeconds: null,
-        } as ServiceOutage,
-        { status: 401 }
-      );
+    // Check authentication
+    if (shouldRequireAuthentication(request, scenario)) {
+      return createAuthError();
     }
 
     // Handle missing or empty character ID
@@ -497,17 +499,11 @@ export const characterServiceHandlers = [
 
   // Handle empty character ID in path
   http.post('*/api/players/me/characters//select', async ({ request }) => {
-    // Check for authentication header (dev mode bypass)
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader && import.meta.env.PROD) {
-      return HttpResponse.json(
-        {
-          service: 'character-service',
-          message: 'Authentication required.',
-          retryAfterSeconds: null,
-        } as ServiceOutage,
-        { status: 401 }
-      );
+    const scenario = request.headers.get('x-mock-scenario');
+    
+    // Check authentication
+    if (shouldRequireAuthentication(request, scenario)) {
+      return createAuthError();
     }
 
     return HttpResponse.json(

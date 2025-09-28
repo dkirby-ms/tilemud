@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useLogout } from '../../src/features/auth/useLogout';
+import { TestAuthWrapper } from '../utils/testAuthWrapper';
 
 describe('Offline Logout Integration', () => {
   let mockNavigatorOnLine: PropertyDescriptor | undefined;
@@ -27,7 +28,9 @@ describe('Offline Logout Integration', () => {
       configurable: true
     });
 
-    const { result } = renderHook(() => useLogout());
+    const { result } = renderHook(() => useLogout(), {
+      wrapper: TestAuthWrapper
+    });
 
     await result.current.logout({ skipConfirmation: true });
 
@@ -47,7 +50,9 @@ describe('Offline Logout Integration', () => {
 
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     
-    const { result } = renderHook(() => useLogout());
+    const { result } = renderHook(() => useLogout(), {
+      wrapper: TestAuthWrapper
+    });
     await result.current.logout({ skipConfirmation: true });
 
     // TODO: Logout event should include wasOffline: true
@@ -70,7 +75,9 @@ describe('Offline Logout Integration', () => {
       }))
     }));
 
-    const { result } = renderHook(() => useLogout());
+    const { result } = renderHook(() => useLogout(), {
+      wrapper: TestAuthWrapper
+    });
 
     // Should not throw error even if MSAL fails
     await expect(result.current.logout({ skipConfirmation: true })).resolves.not.toThrow();
@@ -86,7 +93,9 @@ describe('Offline Logout Integration', () => {
       configurable: true
     });
 
-    const { result } = renderHook(() => useLogout());
+    const { result } = renderHook(() => useLogout(), {
+      wrapper: TestAuthWrapper
+    });
 
     // Simulate connection restoration during logout
     Object.defineProperty(Navigator.prototype, 'onLine', {

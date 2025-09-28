@@ -1,13 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useLogout } from '../../src/features/auth/useLogout';
-
-// Mock MSAL
-vi.mock('@azure/msal-browser', () => ({
-  PublicClientApplication: vi.fn(() => ({
-    logoutRedirect: vi.fn().mockResolvedValue(undefined)
-  }))
-}));
+import { TestAuthWrapper } from '../utils/testAuthWrapper';
 
 describe('Standard Logout Flow Integration', () => {
   beforeEach(() => {
@@ -16,7 +10,9 @@ describe('Standard Logout Flow Integration', () => {
 
   it('should complete standard logout flow', async () => {
     // TODO: This integration test validates the full logout flow
-    const { result } = renderHook(() => useLogout());
+    const { result } = renderHook(() => useLogout(), {
+      wrapper: TestAuthWrapper,
+    });
 
     // Execute logout
     await result.current.logout({ skipConfirmation: true });
@@ -31,7 +27,9 @@ describe('Standard Logout Flow Integration', () => {
   });
 
   it('should show loading state during logout', async () => {
-    const { result } = renderHook(() => useLogout());
+    const { result } = renderHook(() => useLogout(), {
+      wrapper: TestAuthWrapper
+    });
 
     // TODO: Should track loading state during logout process
     expect(result.current.isLoggingOut).toBe(false);
@@ -44,7 +42,9 @@ describe('Standard Logout Flow Integration', () => {
 
   it('should purge character store on logout', async () => {
     // TODO: Verify character store reset is called
-    const { result } = renderHook(() => useLogout());
+    const { result } = renderHook(() => useLogout(), {
+      wrapper: TestAuthWrapper
+    });
 
     await result.current.logout({ skipConfirmation: true });
 

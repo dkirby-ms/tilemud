@@ -1,11 +1,17 @@
 import '@testing-library/jest-dom';
-import { beforeAll, afterEach, afterAll, beforeEach } from 'vitest';
+import { beforeAll, afterEach, afterAll, beforeEach, vi } from 'vitest';
 import { server } from '../src/mocks/server';
 
 /**
  * Mock Service Worker setup for tests.
  * This file is imported by vitest to set up MSW for all test files.
  */
+
+// Mock MSAL globally for all tests
+vi.mock('@azure/msal-browser', async () => {
+  const msalMock = await import('./__mocks__/@azure/msal-browser');
+  return msalMock;
+});
 
 // Enable request interception before all tests
 beforeAll(() => {
