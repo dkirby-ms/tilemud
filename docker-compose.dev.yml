@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: tilemud_dev
+      POSTGRES_USER: tilemud_user
+      POSTGRES_PASSWORD: tilemud_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./server/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tilemud_user -d tilemud_dev"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Test database - separate instance for tests
+  postgres_test:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: tilemud_test
+      POSTGRES_USER: tilemud_user
+      POSTGRES_PASSWORD: tilemud_pass
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+      - ./server/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tilemud_user -d tilemud_test"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  redis_data:
+  postgres_data:
+  postgres_test_data:

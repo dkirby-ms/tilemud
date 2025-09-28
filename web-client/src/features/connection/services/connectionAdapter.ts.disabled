@@ -1,0 +1,1358 @@
+/**
+ * Connection service adapter - HTTP + WebSocket integration (Stub Implementation)
+ * Implements T052: Connection service adapter for HTTP and WebSocket communication
+ * 
+ * Note: This is a foundational implementation that provides the structure for
+ * HTTP API integration and WebSocket communication. Type issues will be resolved
+ * in integration phase.
+ */
+
+import { ConnectionEvent } from '../machine/types';
+import type { ConnectionEventWithPayload } from '../machine/types';
+
+/**
+ * HTTP API endpoints configuration
+ */
+export interface ConnectionAdapterConfig {
+  apiBaseUrl: string;
+  wsBaseUrl: string;
+  timeout: number;
+  clientVersion: string;
+  debug: boolean;
+}
+
+/**
+ * Default adapter configuration
+ */
+export const DEFAULT_ADAPTER_CONFIG: ConnectionAdapterConfig = {
+  apiBaseUrl: '/api',
+  wsBaseUrl: window.location.protocol === 'https:' ? 'wss://' + window.location.host : 'ws://' + window.location.host,
+  timeout: 10000,
+  clientVersion: '1.0.0',
+  debug: false,
+};
+
+/**
+ * Connection service adapter - simplified implementation
+ * Provides HTTP API integration and WebSocket communication framework
+ */
+export class ConnectionAdapter {
+  private config: ConnectionAdapterConfig;
+  private eventHandlers: Map<string, ((event: ConnectionEventWithPayload) => void)[]> = new Map();
+
+  constructor(config: Partial<ConnectionAdapterConfig> = {}) {
+    this.config = { ...DEFAULT_ADAPTER_CONFIG, ...config };
+  }
+
+  /**
+   * Add event listener
+   */
+  on(event: string, handler: (event: ConnectionEventWithPayload) => void): void {
+    if (!this.eventHandlers.has(event)) {
+      this.eventHandlers.set(event, []);
+    }
+    this.eventHandlers.get(event)!.push(handler);
+  }
+
+  /**
+   * Remove event listener
+   */
+  off(event: string, handler: (event: ConnectionEventWithPayload) => void): void {
+    const handlers = this.eventHandlers.get(event);
+    if (handlers) {
+      const index = handlers.indexOf(handler);
+      if (index > -1) {
+        handlers.splice(index, 1);
+      }
+    }
+  }
+
+  /**
+   * Emit event to listeners
+   */
+  private emit(event: string, eventData: ConnectionEventWithPayload): void {
+    if (this.config.debug) {
+      console.log('ConnectionAdapter emitting event:', event, eventData);
+    }
+    
+    const handlers = this.eventHandlers.get(event);
+    if (handlers) {
+      handlers.forEach(handler => handler(eventData));
+    }
+  }
+
+  /**
+   * Request admission to game instance (HTTP API)
+   * Returns promise that resolves with admission response
+   */
+  async requestAdmission(characterId: string, sessionToken?: string): Promise<any> {
+    const url = `${this.config.apiBaseUrl}/instances/default/connect`;
+    
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Client-Version': this.config.clientVersion,
+        },
+        body: JSON.stringify({
+          characterId,
+          sessionToken,
+          clientVersion: this.config.clientVersion,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      // Emit events based on response
+      if (data.outcome === 'ADMITTED') {
+        this.emit('admission_granted', {
+          type: ConnectionEvent.ADMISSION_GRANTED,
+          payload: data,
+        });
+      } else if (data.outcome === 'QUEUED') {
+        this.emit('queued', {
+          type: ConnectionEvent.QUEUED,
+          payload: { queuePosition: data },
+        });
+      } else {
+        this.emit('admission_denied', {
+          type: ConnectionEvent.ADMISSION_DENIED,
+          payload: { outcome: data.outcome },
+        });
+      }
+
+      return data;
+    } catch (error) {
+      this.emit('error', {
+        type: ConnectionEvent.ADMISSION_DENIED,
+        payload: {},
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get queue status (HTTP API)
+   */
+  async getQueueStatus(characterId: string): Promise<any> {
+    const url = `${this.config.apiBaseUrl}/instances/default/queue/status`;
+    
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'X-Character-ID': characterId,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      this.emit('queue_update', {
+        type: ConnectionEvent.QUEUE_POSITION_UPDATE,
+        payload: { queuePosition: data },
+      });
+
+      return data;
+    } catch (error) {
+      console.error('Queue status request failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Connect WebSocket
+   */
+  async connectWebSocket(): Promise<WebSocket> {
+    const wsUrl = `${this.config.wsBaseUrl}/ws`;
+    
+    return new Promise((resolve, reject) => {
+      try {
+        const ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          if (this.config.debug) {
+            console.log('WebSocket connected to:', wsUrl);
+          }
+          resolve(ws);
+        };
+
+        ws.onerror = (error) => {
+          console.error('WebSocket connection error:', error);
+          reject(error);
+        };
+
+        // Timeout for connection
+        const timeout = setTimeout(() => {
+          ws.close();
+          reject(new Error('WebSocket connection timeout'));
+        }, this.config.timeout);
+
+        ws.addEventListener('open', () => clearTimeout(timeout), { once: true });
+
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Send WebSocket message
+   */
+  sendWebSocketMessage(ws: WebSocket, message: any): void {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(message));
+    } else {
+      console.warn('WebSocket not ready, cannot send message:', message);
+    }
+  }
+
+  /**
+   * Handle WebSocket message
+   */
+  handleWebSocketMessage(message: any): void {
+    try {
+      const data = typeof message === 'string' ? JSON.parse(message) : message;
+      
+      if (this.config.debug) {
+        console.log('Received WebSocket message:', data);
+      }
+
+      // Emit events based on message type
+      switch (data.type) {
+        case 'auth_success':
+          this.emit('authenticated', {
+            type: ConnectionEvent.AUTHENTICATED,
+            payload: data,
+          });
+          break;
+
+        case 'queue_update':
+          this.emit('queue_update', {
+            type: ConnectionEvent.QUEUE_POSITION_UPDATE,
+            payload: { queuePosition: data },
+          });
+          break;
+
+        case 'queue_promoted':
+          this.emit('promoted', {
+            type: ConnectionEvent.PROMOTED,
+          });
+          break;
+
+        default:
+          if (this.config.debug) {
+            console.log('Unhandled WebSocket message:', data);
+          }
+          break;
+      }
+    } catch (error) {
+      console.error('Error handling WebSocket message:', error);
+    }
+  }
+
+  /**
+   * Cleanup resources
+   */
+  destroy(): void {
+    this.eventHandlers.clear();
+  }
+}
+
+import { ConnectionEvent } from '../machine/types';
+import type { ConnectionEventWithPayload } from '../machine/types';
+
+/**
+ * HTTP API endpoints configuration
+ */
+export interface ConnectionAdapterConfig {
+  apiBaseUrl: string;
+  wsBaseUrl: string;
+  timeout: number;
+  clientVersion: string;
+  debug: boolean;
+}
+
+/**
+ * Default adapter configuration
+ */
+export const DEFAULT_ADAPTER_CONFIG: ConnectionAdapterConfig = {
+  apiBaseUrl: '/api',
+  wsBaseUrl: window.location.protocol === 'https:' ? 'wss://' + window.location.host : 'ws://' + window.location.host,
+  timeout: 10000,
+  clientVersion: '1.0.0',
+  debug: false,
+};
+
+/**
+ * Connection service adapter - simplified implementation
+ * Provides HTTP API integration and WebSocket communication framework
+ */
+export class ConnectionAdapter {
+  private config: ConnectionAdapterConfig;
+  private eventHandlers: Map<string, ((event: ConnectionEventWithPayload) => void)[]> = new Map();
+
+  constructor(config: Partial<ConnectionAdapterConfig> = {}) {
+    this.config = { ...DEFAULT_ADAPTER_CONFIG, ...config };
+  }
+
+  /**
+   * Add event listener
+   */
+  on(event: string, handler: (event: ConnectionEventWithPayload) => void): void {
+    if (!this.eventHandlers.has(event)) {
+      this.eventHandlers.set(event, []);
+    }
+    this.eventHandlers.get(event)!.push(handler);
+  }
+
+  /**
+   * Remove event listener
+   */
+  off(event: string, handler: (event: ConnectionEventWithPayload) => void): void {
+    const handlers = this.eventHandlers.get(event);
+    if (handlers) {
+      const index = handlers.indexOf(handler);
+      if (index > -1) {
+        handlers.splice(index, 1);
+      }
+    }
+  }
+
+  /**
+   * Emit event to listeners
+   */
+  private emit(event: string, eventData: ConnectionEventWithPayload): void {
+    if (this.config.debug) {
+      console.log('ConnectionAdapter emitting event:', event, eventData);
+    }
+    
+    const handlers = this.eventHandlers.get(event);
+    if (handlers) {
+      handlers.forEach(handler => handler(eventData));
+    }
+  }
+
+  /**
+   * Request admission to game instance (HTTP API)
+   * Returns promise that resolves with admission response
+   */
+  async requestAdmission(characterId: string, sessionToken?: string): Promise<any> {
+    const url = `${this.config.apiBaseUrl}/instances/default/connect`;
+    
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Client-Version': this.config.clientVersion,
+        },
+        body: JSON.stringify({
+          characterId,
+          sessionToken,
+          clientVersion: this.config.clientVersion,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      // Emit events based on response
+      if (data.outcome === 'ADMITTED') {
+        this.emit('admission_granted', {
+          type: ConnectionEvent.ADMISSION_GRANTED,
+          payload: data,
+        });
+      } else if (data.outcome === 'QUEUED') {
+        this.emit('queued', {
+          type: ConnectionEvent.QUEUED,
+          payload: { queuePosition: data },
+        });
+      } else {
+        this.emit('admission_denied', {
+          type: ConnectionEvent.ADMISSION_DENIED,
+          payload: { outcome: data.outcome },
+        });
+      }
+
+      return data;
+    } catch (error) {
+      this.emit('error', {
+        type: ConnectionEvent.ADMISSION_DENIED,
+        payload: {},
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get queue status (HTTP API)
+   */
+  async getQueueStatus(characterId: string): Promise<any> {
+    const url = `${this.config.apiBaseUrl}/instances/default/queue/status`;
+    
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'X-Character-ID': characterId,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      this.emit('queue_update', {
+        type: ConnectionEvent.QUEUE_POSITION_UPDATE,
+        payload: { queuePosition: data },
+      });
+
+      return data;
+    } catch (error) {
+      console.error('Queue status request failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Connect WebSocket
+   */
+  async connectWebSocket(): Promise<WebSocket> {
+    const wsUrl = `${this.config.wsBaseUrl}/ws`;
+    
+    return new Promise((resolve, reject) => {
+      try {
+        const ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          if (this.config.debug) {
+            console.log('WebSocket connected to:', wsUrl);
+          }
+          resolve(ws);
+        };
+
+        ws.onerror = (error) => {
+          console.error('WebSocket connection error:', error);
+          reject(error);
+        };
+
+        // Timeout for connection
+        const timeout = setTimeout(() => {
+          ws.close();
+          reject(new Error('WebSocket connection timeout'));
+        }, this.config.timeout);
+
+        ws.addEventListener('open', () => clearTimeout(timeout), { once: true });
+
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Send WebSocket message
+   */
+  sendWebSocketMessage(ws: WebSocket, message: any): void {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(message));
+    } else {
+      console.warn('WebSocket not ready, cannot send message:', message);
+    }
+  }
+
+  /**
+   * Handle WebSocket message
+   */
+  handleWebSocketMessage(message: any): void {
+    try {
+      const data = typeof message === 'string' ? JSON.parse(message) : message;
+      
+      if (this.config.debug) {
+        console.log('Received WebSocket message:', data);
+      }
+
+      // Emit events based on message type
+      switch (data.type) {
+        case 'auth_success':
+          this.emit('authenticated', {
+            type: ConnectionEvent.AUTHENTICATED,
+            payload: data,
+          });
+          break;
+
+        case 'queue_update':
+          this.emit('queue_update', {
+            type: ConnectionEvent.QUEUE_POSITION_UPDATE,
+            payload: { queuePosition: data },
+          });
+          break;
+
+        case 'queue_promoted':
+          this.emit('promoted', {
+            type: ConnectionEvent.PROMOTED,
+          });
+          break;
+
+        default:
+          if (this.config.debug) {
+            console.log('Unhandled WebSocket message:', data);
+          }
+          break;
+      }
+    } catch (error) {
+      console.error('Error handling WebSocket message:', error);
+    }
+  }
+
+  /**
+   * Cleanup resources
+   */
+  destroy(): void {
+    this.eventHandlers.clear();
+  }
+}
+
+import { ConnectionEvent } from '../machine/types';
+import type { ConnectionEventWithPayload } from '../machine/types';
+
+/**
+ * HTTP API endpoints configuration
+ */
+export interface ConnectionAdapterConfig {
+  apiBaseUrl: string;
+  wsBaseUrl: string;
+  timeout: number;
+  clientVersion: string;
+  debug: boolean;
+}
+
+/**
+ * Default adapter configuration
+ */
+export const DEFAULT_ADAPTER_CONFIG: ConnectionAdapterConfig = {
+  apiBaseUrl: '/api',
+  wsBaseUrl: window.location.protocol === 'https:' ? 'wss://' + window.location.host : 'ws://' + window.location.host,
+  timeout: 10000,
+  clientVersion: '1.0.0',
+  debug: false,
+};
+
+/**
+ * Connection service adapter - simplified implementation
+ * Provides HTTP API integration and WebSocket communication framework
+ */
+export class ConnectionAdapter {
+  private config: ConnectionAdapterConfig;
+  private eventHandlers: Map<string, ((event: ConnectionEventWithPayload) => void)[]> = new Map();
+
+  constructor(config: Partial<ConnectionAdapterConfig> = {}) {
+    this.config = { ...DEFAULT_ADAPTER_CONFIG, ...config };
+  }
+
+  /**
+   * Add event listener
+   */
+  on(event: string, handler: (event: ConnectionEventWithPayload) => void): void {
+    if (!this.eventHandlers.has(event)) {
+      this.eventHandlers.set(event, []);
+    }
+    this.eventHandlers.get(event)!.push(handler);
+  }
+
+  /**
+   * Remove event listener
+   */
+  off(event: string, handler: (event: ConnectionEventWithPayload) => void): void {
+    const handlers = this.eventHandlers.get(event);
+    if (handlers) {
+      const index = handlers.indexOf(handler);
+      if (index > -1) {
+        handlers.splice(index, 1);
+      }
+    }
+  }
+
+  /**
+   * Emit event to listeners
+   */
+  private emit(event: string, eventData: ConnectionEventWithPayload): void {
+    if (this.config.debug) {
+      console.log('ConnectionAdapter emitting event:', event, eventData);
+    }
+    
+    const handlers = this.eventHandlers.get(event);
+    if (handlers) {
+      handlers.forEach(handler => handler(eventData));
+    }
+  }
+
+  /**
+   * Request admission to game instance (HTTP API)
+   * Returns promise that resolves with admission response
+   */
+  async requestAdmission(characterId: string, sessionToken?: string): Promise<any> {
+    const url = `${this.config.apiBaseUrl}/instances/default/connect`;
+    
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Client-Version': this.config.clientVersion,
+        },
+        body: JSON.stringify({
+          characterId,
+          sessionToken,
+          clientVersion: this.config.clientVersion,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      // Emit events based on response
+      if (data.outcome === 'ADMITTED') {
+        this.emit('admission_granted', {
+          type: ConnectionEvent.ADMISSION_GRANTED,
+          payload: data,
+        });
+      } else if (data.outcome === 'QUEUED') {
+        this.emit('queued', {
+          type: ConnectionEvent.QUEUED,
+          payload: { queuePosition: data },
+        });
+      } else {
+        this.emit('admission_denied', {
+          type: ConnectionEvent.ADMISSION_DENIED,
+          payload: { outcome: data.outcome, error: data.error },
+        });
+      }
+
+      return data;
+    } catch (error) {
+      this.emit('error', {
+        type: ConnectionEvent.ADMISSION_DENIED,
+        payload: { error: { message: error instanceof Error ? error.message : 'Request failed' } },
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get queue status (HTTP API)
+   */
+  async getQueueStatus(characterId: string): Promise<any> {
+    const url = `${this.config.apiBaseUrl}/instances/default/queue/status`;
+    
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'X-Character-ID': characterId,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      this.emit('queue_update', {
+        type: ConnectionEvent.QUEUE_POSITION_UPDATE,
+        payload: { queuePosition: data },
+      });
+
+      return data;
+    } catch (error) {
+      console.error('Queue status request failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Connect WebSocket
+   */
+  async connectWebSocket(): Promise<WebSocket> {
+    const wsUrl = `${this.config.wsBaseUrl}/ws`;
+    
+    return new Promise((resolve, reject) => {
+      try {
+        const ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          if (this.config.debug) {
+            console.log('WebSocket connected to:', wsUrl);
+          }
+          resolve(ws);
+        };
+
+        ws.onerror = (error) => {
+          console.error('WebSocket connection error:', error);
+          reject(error);
+        };
+
+        // Timeout for connection
+        const timeout = setTimeout(() => {
+          ws.close();
+          reject(new Error('WebSocket connection timeout'));
+        }, this.config.timeout);
+
+        ws.addEventListener('open', () => clearTimeout(timeout), { once: true });
+
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Send WebSocket message
+   */
+  sendWebSocketMessage(ws: WebSocket, message: any): void {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(message));
+    } else {
+      console.warn('WebSocket not ready, cannot send message:', message);
+    }
+  }
+
+  /**
+   * Handle WebSocket message
+   */
+  handleWebSocketMessage(message: any): void {
+    try {
+      const data = typeof message === 'string' ? JSON.parse(message) : message;
+      
+      if (this.config.debug) {
+        console.log('Received WebSocket message:', data);
+      }
+
+      // Emit events based on message type
+      switch (data.type) {
+        case 'auth_success':
+          this.emit('authenticated', {
+            type: ConnectionEvent.AUTHENTICATED,
+            payload: data,
+          });
+          break;
+
+        case 'queue_update':
+          this.emit('queue_update', {
+            type: ConnectionEvent.QUEUE_POSITION_UPDATE,
+            payload: { queuePosition: data },
+          });
+          break;
+
+        case 'queue_promoted':
+          this.emit('promoted', {
+            type: ConnectionEvent.PROMOTED,
+          });
+          break;
+
+        default:
+          if (this.config.debug) {
+            console.log('Unhandled WebSocket message:', data);
+          }
+          break;
+      }
+    } catch (error) {
+      console.error('Error handling WebSocket message:', error);
+    }
+  }
+
+  /**
+   * Cleanup resources
+   */
+  destroy(): void {
+    this.eventHandlers.clear();
+  }
+}
+
+/**
+ * Admission request payload
+ */
+export interface AdmissionRequest {
+  characterId: string;
+  sessionToken?: string;
+  reconnectionToken?: string;
+  clientVersion: string;
+  instanceId?: string;
+}
+
+/**
+ * Admission response from server
+ */
+export interface AdmissionResponse {
+  outcome: AdmissionOutcome;
+  sessionToken?: string;
+  reconnectionToken?: string;
+  instanceId?: string;
+  position?: number;
+  depth?: number;
+  estimatedWaitTime?: number;
+  reason?: string;
+  retryAfterSeconds?: number;
+  maintenanceInfo?: MaintenanceInfo;
+  rateLimitInfo?: {
+    remaining: number;
+    resetTime: string;
+  };
+  error?: {
+    code: string;
+    message: string;
+    details?: any;
+  };
+}
+
+/**
+ * Queue status response
+ */
+export interface QueueStatusResponse {
+  position: number;
+  depth: number;
+  estimatedWaitTime?: number;
+  lastUpdated: string;
+}
+
+/**
+ * WebSocket message types
+ */
+export type WebSocketMessage = 
+  | { type: 'auth_request'; characterId: string; sessionToken?: string; reconnectionToken?: string }
+  | { type: 'auth_success'; sessionToken: string; reconnectionToken?: string }
+  | { type: 'auth_failure'; error: { code: string; message: string } }
+  | { type: 'admission_request'; characterId: string; sessionToken: string; clientVersion: string; instanceId?: string }
+  | { type: 'admission_response'; outcome: AdmissionOutcome; [key: string]: any }
+  | { type: 'queue_status_request'; characterId: string }
+  | { type: 'queue_update'; position: number; depth: number; estimatedWaitTime?: number }
+  | { type: 'queue_promoted' }
+  | { type: 'drain_mode'; maintenanceInfo?: MaintenanceInfo }
+  | { type: 'maintenance'; maintenanceInfo?: MaintenanceInfo }
+  | { type: 'heartbeat'; timestamp: number }
+  | { type: 'pong'; timestamp: number };
+
+/**
+ * Connection service adapter
+ * Handles HTTP API calls and WebSocket communication
+ */
+export class ConnectionAdapter {
+  private config: ConnectionAdapterConfig;
+  private ws: WebSocket | null = null;
+  private heartbeatInterval: number | null = null;
+  private eventHandlers: Map<string, ((event: ConnectionEventWithPayload) => void)[]> = new Map();
+
+  constructor(config: Partial<ConnectionAdapterConfig> = {}) {
+    this.config = { ...DEFAULT_ADAPTER_CONFIG, ...config };
+    
+    if (this.config.debug) {
+      console.log('ConnectionAdapter initialized with config:', this.config);
+    }
+  }
+
+  /**
+   * Add event listener
+   */
+  on(event: string, handler: (event: ConnectionEventWithPayload) => void): void {
+    if (!this.eventHandlers.has(event)) {
+      this.eventHandlers.set(event, []);
+    }
+    this.eventHandlers.get(event)!.push(handler);
+  }
+
+  /**
+   * Remove event listener
+   */
+  off(event: string, handler: (event: ConnectionEventWithPayload) => void): void {
+    const handlers = this.eventHandlers.get(event);
+    if (handlers) {
+      const index = handlers.indexOf(handler);
+      if (index > -1) {
+        handlers.splice(index, 1);
+      }
+    }
+  }
+
+  /**
+   * Emit event to listeners
+   */
+  private emit(event: string, eventData: ConnectionEventWithPayload): void {
+    if (this.config.debug) {
+      console.log('ConnectionAdapter emitting event:', event, eventData);
+    }
+    
+    const handlers = this.eventHandlers.get(event);
+    if (handlers) {
+      handlers.forEach(handler => handler(eventData));
+    }
+  }
+
+  /**
+   * Make HTTP request with error handling
+   */
+  private async httpRequest<T>(
+    method: string, 
+    path: string, 
+    body?: any,
+    headers: Record<string, string> = {}
+  ): Promise<T> {
+    const url = `${this.config.apiBaseUrl}${path}`;
+    
+    const requestHeaders = {
+      'Content-Type': 'application/json',
+      'X-Client-Version': this.config.clientVersion,
+      ...headers,
+    };
+
+    if (this.config.debug) {
+      console.log(`HTTP ${method} ${url}:`, { body, headers: requestHeaders });
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+
+      const response = await fetch(url, {
+        method,
+        headers: requestHeaders,
+        body: body ? JSON.stringify(body) : null,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`HTTP ${response.status}: ${errorData.message || response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (this.config.debug) {
+        console.log(`HTTP ${method} ${url} response:`, data);
+      }
+      
+      return data;
+    } catch (error) {
+      if (this.config.debug) {
+        console.error(`HTTP ${method} ${url} error:`, error);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Request admission to game instance
+   */
+  async requestAdmission(request: AdmissionRequest): Promise<AdmissionResponse> {
+    const instanceId = request.instanceId || 'default';
+    const path = `/instances/${instanceId}/connect`;
+    
+    try {
+      const response = await this.httpRequest<AdmissionResponse>('POST', path, {
+        characterId: request.characterId,
+        sessionToken: request.sessionToken,
+        reconnectionToken: request.reconnectionToken,
+        clientVersion: request.clientVersion,
+      });
+
+      // Emit appropriate event based on outcome
+      switch (response.outcome) {
+        case AdmissionOutcome.ADMITTED:
+          this.emit('admission_granted', {
+            type: ConnectionEvent.ADMISSION_GRANTED,
+            payload: {
+              ...(response.sessionToken && { sessionToken: response.sessionToken }),
+              ...(response.reconnectionToken && { reconnectionToken: response.reconnectionToken }),
+              ...(response.instanceId && { instanceId: response.instanceId }),
+            },
+          });
+          break;
+
+        case AdmissionOutcome.QUEUED:
+          this.emit('queued', {
+            type: ConnectionEvent.QUEUED,
+            payload: {
+              queuePosition: {
+                position: response.position || 0,
+                depth: response.depth || 0,
+                ...(response.estimatedWaitTime && { estimatedWaitTime: response.estimatedWaitTime }),
+                lastUpdated: new Date(),
+              },
+            },
+          });
+          break;
+
+        default:
+          this.emit('admission_denied', {
+            type: ConnectionEvent.ADMISSION_DENIED,
+            payload: {
+              outcome: response.outcome,
+              error: response.error,
+              maintenanceInfo: response.maintenanceInfo,
+              rateLimitInfo: response.rateLimitInfo ? {
+                remaining: response.rateLimitInfo.remaining,
+                resetTime: new Date(response.rateLimitInfo.resetTime),
+              } : undefined,
+            },
+          });
+          break;
+      }
+
+      return response;
+    } catch (error) {
+      const connectionError: ConnectionError = {
+        type: 'server',
+        code: 'ADMISSION_REQUEST_FAILED',
+        message: error instanceof Error ? error.message : 'Admission request failed',
+        timestamp: new Date(),
+        retryable: true,
+        details: error,
+      };
+
+      this.emit('error', {
+        type: ConnectionEvent.ADMISSION_DENIED,
+        payload: { error: connectionError },
+      });
+
+      throw error;
+    }
+  }
+
+  /**
+   * Get queue status
+   */
+  async getQueueStatus(characterId: string, instanceId: string = 'default'): Promise<QueueStatusResponse> {
+    const path = `/instances/${instanceId}/queue/status`;
+    
+    try {
+      const response = await this.httpRequest<QueueStatusResponse>('GET', path, undefined, {
+        'X-Character-ID': characterId,
+      });
+
+      // Emit queue update event
+      this.emit('queue_update', {
+        type: ConnectionEvent.QUEUE_POSITION_UPDATE,
+        payload: {
+          queuePosition: {
+            position: response.position,
+            depth: response.depth,
+            estimatedWaitTime: response.estimatedWaitTime,
+            lastUpdated: new Date(response.lastUpdated),
+          },
+        },
+      });
+
+      return response;
+    } catch (error) {
+      if (this.config.debug) {
+        console.error('Queue status request failed:', error);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Connect WebSocket
+   */
+  connectWebSocket(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        resolve();
+        return;
+      }
+
+      try {
+        const wsUrl = `${this.config.wsBaseUrl}/ws`;
+        
+        if (this.config.debug) {
+          console.log('Connecting WebSocket to:', wsUrl);
+        }
+
+        this.ws = new WebSocket(wsUrl);
+
+        this.ws.onopen = () => {
+          if (this.config.debug) {
+            console.log('WebSocket connected');
+          }
+          
+          this.startHeartbeat();
+          resolve();
+        };
+
+        this.ws.onmessage = (event) => {
+          this.handleWebSocketMessage(event);
+        };
+
+        this.ws.onclose = (event) => {
+          if (this.config.debug) {
+            console.log('WebSocket closed:', event.code, event.reason);
+          }
+          
+          this.stopHeartbeat();
+          
+          if (event.code !== 1000) { // Not normal closure
+            this.emit('connection_lost', {
+              type: ConnectionEvent.CONNECTION_LOST,
+            });
+          } else {
+            this.emit('disconnected', {
+              type: ConnectionEvent.DISCONNECT,
+            });
+          }
+        };
+
+        this.ws.onerror = (error) => {
+          if (this.config.debug) {
+            console.error('WebSocket error:', error);
+          }
+          
+          this.emit('error', {
+            type: ConnectionEvent.CONNECTION_LOST,
+            payload: {
+              error: {
+                type: 'network',
+                code: 'WEBSOCKET_ERROR',
+                message: 'WebSocket connection error',
+                timestamp: new Date(),
+                retryable: true,
+              } as ConnectionError,
+            },
+          });
+          
+          reject(error);
+        };
+
+        // Connection timeout
+        const timeout = setTimeout(() => {
+          if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
+            this.ws.close();
+            reject(new Error('WebSocket connection timeout'));
+          }
+        }, this.config.timeout);
+
+        this.ws.addEventListener('open', () => clearTimeout(timeout), { once: true });
+
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Disconnect WebSocket
+   */
+  disconnectWebSocket(): void {
+    if (this.ws) {
+      this.stopHeartbeat();
+      this.ws.close(1000, 'Normal closure');
+      this.ws = null;
+    }
+  }
+
+  /**
+   * Send WebSocket message
+   */
+  sendWebSocketMessage(message: WebSocketMessage): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      if (this.config.debug) {
+        console.log('Sending WebSocket message:', message);
+      }
+      
+      this.ws.send(JSON.stringify(message));
+    } else {
+      console.warn('WebSocket not connected, cannot send message:', message);
+    }
+  }
+
+  /**
+   * Handle incoming WebSocket message
+   */
+  private handleWebSocketMessage(event: MessageEvent): void {
+    try {
+      const message: WebSocketMessage = JSON.parse(event.data);
+      
+      if (this.config.debug) {
+        console.log('Received WebSocket message:', message);
+      }
+
+      switch (message.type) {
+        case 'auth_success':
+          this.emit('authenticated', {
+            type: ConnectionEvent.AUTHENTICATED,
+            payload: {
+              sessionToken: message.sessionToken,
+              reconnectionToken: message.reconnectionToken,
+            },
+          });
+          break;
+
+        case 'auth_failure':
+          this.emit('auth_failed', {
+            type: ConnectionEvent.AUTHENTICATION_FAILED,
+            payload: { error: message.error },
+          });
+          break;
+
+        case 'admission_response':
+          // Handle via HTTP response, but also support WS response
+          switch (message.outcome) {
+            case AdmissionOutcome.ADMITTED:
+              this.emit('admission_granted', {
+                type: ConnectionEvent.ADMISSION_GRANTED,
+                payload: message,
+              });
+              break;
+            case AdmissionOutcome.QUEUED:
+              this.emit('queued', {
+                type: ConnectionEvent.QUEUED,
+                payload: { queuePosition: message },
+              });
+              break;
+            default:
+              this.emit('admission_denied', {
+                type: ConnectionEvent.ADMISSION_DENIED,
+                payload: { outcome: message.outcome, error: message },
+              });
+              break;
+          }
+          break;
+
+        case 'queue_update':
+          this.emit('queue_update', {
+            type: ConnectionEvent.QUEUE_POSITION_UPDATE,
+            payload: {
+              queuePosition: {
+                position: message.position,
+                depth: message.depth,
+                estimatedWaitTime: message.estimatedWaitTime,
+                lastUpdated: new Date(),
+              },
+            },
+          });
+          break;
+
+        case 'queue_promoted':
+          this.emit('promoted', {
+            type: ConnectionEvent.PROMOTED,
+          });
+          break;
+
+        case 'drain_mode':
+          this.emit('drain_mode', {
+            type: ConnectionEvent.DRAIN_MODE,
+            payload: { maintenanceInfo: message.maintenanceInfo },
+          });
+          break;
+
+        case 'maintenance':
+          this.emit('maintenance', {
+            type: ConnectionEvent.MAINTENANCE,
+            payload: { maintenanceInfo: message.maintenanceInfo },
+          });
+          break;
+
+        case 'heartbeat':
+          // Respond to heartbeat
+          this.sendWebSocketMessage({ type: 'pong', timestamp: Date.now() });
+          break;
+
+        case 'pong':
+          // Heartbeat response received
+          break;
+
+        default:
+          if (this.config.debug) {
+            console.warn('Unknown WebSocket message type:', message);
+          }
+          break;
+      }
+    } catch (error) {
+      console.error('Error parsing WebSocket message:', error);
+    }
+  }
+
+  /**
+   * Start heartbeat ping
+   */
+  private startHeartbeat(): void {
+    this.stopHeartbeat();
+    
+    this.heartbeatInterval = window.setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.sendWebSocketMessage({ type: 'heartbeat', timestamp: Date.now() });
+      }
+    }, 30000); // 30 second heartbeat
+  }
+
+  /**
+   * Stop heartbeat ping
+   */
+  private stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  /**
+   * Authenticate with server
+   */
+  authenticate(characterId: string, sessionToken?: string, reconnectionToken?: string): void {
+    this.sendWebSocketMessage({
+      type: 'auth_request',
+      characterId,
+      sessionToken,
+      reconnectionToken,
+    });
+  }
+
+  /**
+   * Request admission via WebSocket (alternative to HTTP)
+   */
+  requestAdmissionWS(characterId: string, sessionToken: string, instanceId?: string): void {
+    this.sendWebSocketMessage({
+      type: 'admission_request',
+      characterId,
+      sessionToken,
+      clientVersion: this.config.clientVersion,
+      instanceId,
+    });
+  }
+
+  /**
+   * Request queue status via WebSocket
+   */
+  requestQueueStatusWS(characterId: string): void {
+    this.sendWebSocketMessage({
+      type: 'queue_status_request',
+      characterId,
+    });
+  }
+
+  /**
+   * Cleanup resources
+   */
+  destroy(): void {
+    this.disconnectWebSocket();
+    this.eventHandlers.clear();
+  }
+}
