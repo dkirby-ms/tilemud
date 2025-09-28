@@ -1,3 +1,3 @@
-// Connection state machine exports - FSM logic, types, and reducer
+// Connection state machine exports - FSM logic, types, and state machine
 export * from './types';
-export * from './reducer';
+export * from './stateMachine';

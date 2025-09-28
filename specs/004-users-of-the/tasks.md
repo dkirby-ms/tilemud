@@ -69,23 +69,30 @@ Follows template: Setup → Tests (failing) → Core (models/services) → Endpo
 - [x] T086: Create integration test for frontend status mapping (connect.frontendStatusMapping.spec.ts) ✓
 
 ## Phase 3.3: Core Implementation (Backend Models/Services)
-- [ ] T032 Implement enums & shared types in `server/src/domain/connection/types.ts` (if not done fully in T005) + export.
-- [ ] T033 [P] Implement Redis key builder + prefixes in `server/src/infra/persistence/redisKeys.ts`.
-- [ ] T034 [P] Implement rate limit repository (sliding window) `server/src/application/services/rateLimit/rateLimitService.ts`.
-- [ ] T035 [P] Implement queue repository (sorted set) `server/src/application/services/queue/queueService.ts` with enqueue, position, promote.
-- [ ] T036 [P] Implement session service `server/src/application/services/session/sessionService.ts` (admit, replace, enterGrace, finalize, reconnect).
-- [ ] T037 Admission atomic Lua script in `server/src/application/services/session/admission.lua` (capacity, active check, enqueue decision) + loader.
-- [ ] T038 Implement janitor job (cleanup grace expiry, stale sessions) `server/src/application/jobs/sessionJanitor.ts`.
+- [x] T032: Implement enums & shared types in `server/src/domain/connection/types.ts` (already completed) ✓
+- [x] T033: Implement Redis key builder + prefixes in `server/src/infra/persistence/redisKeys.ts` ✓
+- [x] T034: Implement rate limit service (sliding window) `server/src/application/services/rateLimit/rateLimitService.ts` ✓
+- [x] T035: Implement queue service (sorted set) `server/src/application/services/queue/queueService.ts` with enqueue, position, promote ✓
+- [x] T036: Implement session service `server/src/application/services/session/sessionService.ts` (admit, replace, enterGrace, finalize, reconnect) ✓
+- [x] T037: Admission atomic Lua script in `server/src/application/services/session/admission.lua` + loader `luaScriptLoader.ts` ✓
+- [x] T038: Implement janitor job (cleanup grace expiry, stale sessions) `server/src/application/jobs/sessionJanitor.ts` ✓
 
 ## Phase 3.4: Backend Endpoints & WebSocket Integration
-- [ ] T039 POST /instances/:id/connect route `server/src/api/routes/admission.ts` (handles: version check, rate limit, active session, drain/queue logic, 10s outcome timer, returns structured response).
-- [ ] T040 [P] GET /instances/:id/queue/status route `server/src/api/routes/queueStatus.ts`.
-- [ ] T041 [P] Integrate reconnection token handling into WebSocket handshake `server/src/ws/presence/reconnectHandler.ts`.
-- [ ] T042 [P] Implement replacement confirmation param handling in admission route (replaceToken semantics).
-- [ ] T043 [P] Metrics instrumentation (prom-client counters, histograms) `server/src/infra/monitoring/metricsConnection.ts`.
-- [ ] T044 [P] Structured event logging integration `server/src/infra/monitoring/connectionEvents.ts`.
-- [ ] T045 Rate limit failure path returns 429 with retryAfterSeconds header.
-- [ ] T046 Drain mode flag integration (config/env + route behavior) `server/src/config/env.ts` & admission logic.
+- [x] T039 POST /instances/:id/connect route `server/src/api/routes/admission.ts` (handles: version check, rate limit, active session, drain/queue logic, 10s outcome timer, returns structured response) ✓
+- [x] T040 GET /instances/:id/queue/status route `server/src/api/routes/queueStatus.ts` ✓
+- [x] T041 WebSocket reconnection token handling `server/src/ws/presence/reconnectHandler.ts` & middleware `server/src/ws/presence/admissionMiddleware.ts` ✓
+- [x] T042 Metrics instrumentation (prom-client counters, histograms) `server/src/infra/monitoring/admissionMetrics.ts` & endpoint `server/src/api/routes/metrics.ts` ✓
+- [x] T043 Structured event logging integration `server/src/infra/monitoring/admissionLogger.ts` ✓
+- [x] T044 Rate limit headers (X-RateLimit-*) added to admission endpoint ✓
+- [ ] T045 Drain mode flag integration (config/env + route behavior) `server/src/config/env.ts` & admission logic.
+- [ ] T046 Error handling & validation improvements (need to fix build issues and type problems).
+
+## Phase 3.5: Frontend Implementation
+- [ ] T047 Implement connection state enums & types `web-client/src/features/connection/machine/types.ts`.
+- [ ] T048 [P] Implement pure reducer / FSM logic `web-client/src/features/connection/machine/reducer.ts`.
+- [ ] T049 [P] Implement hook `useConnection` orchestrating timers, queue polling, reconnection token usage.
+- [ ] T050 [P] Implement replacement prompt component `web-client/src/features/connection/components/ReplacementPrompt.tsx`.
+- [ ] T051 [P] Implement status indicator component `web-client/src/features/connection/components/ConnectionStatus.tsx`.
 
 ## Phase 3.5: Frontend Implementation
 - [ ] T047 Implement connection state enums & types `web-client/src/features/connection/machine/types.ts`.

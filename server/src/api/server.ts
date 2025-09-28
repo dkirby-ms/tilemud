@@ -5,6 +5,8 @@ import { registerAuthRoutes } from './routes/auth';
 import { registerArenaRoutes } from './routes/arenas';
 import { registerGuildRoutes } from './routes/guilds';
 import { registerReplayRoutes } from './routes/replays';
+import { registerInstanceRoutes } from './routes/instance';
+import { initializeServices } from '../infra/container/serviceContainer';
 
 const logger = createServiceLogger('HTTPServer');
 
@@ -12,11 +14,23 @@ const logger = createServiceLogger('HTTPServer');
  * Build and configure the Fastify HTTP server
  * Integrates all API routes and middleware
  */
-export function buildApp(opts?: FastifyServerOptions): FastifyInstance {
+export async function buildApp(opts?: FastifyServerOptions): Promise<FastifyInstance> {
   const app = fastify({
     logger: opts?.logger ?? true,
     ...opts
   });
+
+  // Initialize services before setting up routes
+  try {
+    await initializeServices();
+    logger.info({ event: 'services_initialized' }, 'Application services initialized');
+  } catch (error) {
+    logger.error({
+      event: 'service_initialization_failed',
+      error: error instanceof Error ? error.message : String(error)
+    }, 'Failed to initialize services');
+    throw error;
+  }
 
   // Add global error handler
   app.setErrorHandler((error, request, reply) => {
@@ -92,6 +106,7 @@ export function buildApp(opts?: FastifyServerOptions): FastifyInstance {
   app.register(registerArenaRoutes);
   app.register(registerGuildRoutes);
   app.register(registerReplayRoutes);
+  app.register(registerInstanceRoutes);
 
   // Health check endpoint
   app.get('/health', async (_request, _reply) => {
@@ -167,7 +182,7 @@ export function buildApp(opts?: FastifyServerOptions): FastifyInstance {
  * Start the HTTP server
  */
 export async function startServer(port = 3000, host = '0.0.0.0'): Promise<FastifyInstance> {
-  const app = buildApp();
+  const app = await buildApp();
 
   try {
     await app.listen({ port, host });

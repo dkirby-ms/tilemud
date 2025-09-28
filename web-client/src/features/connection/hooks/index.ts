@@ -1,2 +1,2 @@
-// Connection hooks exports - useConnection for orchestrating connection state
-export * from './useConnection';
+// Connection hooks exports - placeholder for future hooks
+// export * from './useConnection';

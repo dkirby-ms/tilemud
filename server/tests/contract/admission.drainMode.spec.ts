@@ -1,18 +1,24 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/api/server';
+import { createTestApp } from '../helpers/mockServiceContainer';
 import { FailureReason, AttemptOutcome } from '../../src/domain/connection';
 
 describe('Admission Contract - Drain Mode Rejection', () => {
   let server: FastifyInstance;
+  let cleanup: () => Promise<void>;
 
   beforeEach(async () => {
-    server = buildApp({ logger: false });
+    const testSetup = await createTestApp();
+    server = testSetup.app;
+    cleanup = testSetup.cleanup;
     await server.ready();
   });
 
   afterEach(async () => {
-    await server.close();
+    if (cleanup) {
+      await cleanup();
+    }
   });
 
   it('should reject new connections in drain mode', async () => {
@@ -28,8 +34,8 @@ describe('Admission Contract - Drain Mode Rejection', () => {
         'authorization': 'Bearer valid-jwt-token'
       },
       payload: {
-        characterId: 'char-001',
-        clientBuild: '1.0.0'
+        characterId: '550e8400-e29b-41d4-a716-446655440000', // Valid UUID
+        clientVersion: '1.0.0' // Changed from clientBuild
       }
     });
 
@@ -92,8 +98,8 @@ describe('Admission Contract - Drain Mode Rejection', () => {
         'authorization': 'Bearer valid-jwt-token'
       },
       payload: {
-        characterId: 'char-001',
-        clientBuild: '1.0.0'
+        characterId: '550e8400-e29b-41d4-a716-446655440001', // Valid UUID
+        clientVersion: '1.0.0' // Changed from clientBuild
       }
     });
 
@@ -128,8 +134,8 @@ describe('Admission Contract - Drain Mode Rejection', () => {
         'authorization': 'Bearer valid-jwt-token'
       },
       payload: {
-        characterId: 'char-001',
-        clientBuild: '1.0.0'
+        characterId: '550e8400-e29b-41d4-a716-446655440002', // Valid UUID
+        clientVersion: '1.0.0' // Changed from clientBuild
       }
     });
 

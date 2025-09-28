@@ -1,2 +1,2 @@
-// Connection services exports - HTTP/WebSocket adapter, token management
-export * from './connectionAdapter';
+// Connection services exports - placeholder for future services
+// export * from './connectionAdapter';

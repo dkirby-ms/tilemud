@@ -3,6 +3,40 @@
  * Shared across server components and tests
  */
 
+// Admission response status
+export enum AdmissionStatus {
+  ADMITTED = 'admitted',
+  REPLACED = 'replaced', 
+  QUEUED = 'queued',
+  REJECTED = 'rejected',
+  RATE_LIMITED = 'rate_limited',
+  TIMEOUT = 'timeout',
+  ERROR = 'error'
+}
+
+// Specific admission outcomes for detailed response handling
+export enum AdmissionOutcome {
+  ADMITTED = 'admitted',
+  REPLACED = 'replaced',
+  QUEUED = 'queued',
+  ALREADY_IN_SESSION = 'already_in_session',
+  INVALID_REPLACE_TOKEN = 'invalid_replace_token',
+  SUSPENDED = 'suspended',
+  INVALID_INSTANCE = 'invalid_instance',
+  DRAIN_MODE = 'drain_mode',
+  RATE_LIMITED = 'rate_limited',
+  TIMEOUT = 'timeout',
+  INVALID_REQUEST = 'invalid_request',
+  SERVER_ERROR = 'server_error'
+}
+
+// Queue position information
+export interface QueuePosition {
+  position: number;
+  depth: number;
+  estimatedWaitSeconds: number;
+}
+
 // Session lifecycle states
 export enum SessionState {
   PENDING = 'pending',      // Admission logic executing

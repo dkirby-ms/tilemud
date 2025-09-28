@@ -39,6 +39,10 @@ const EnvSchema = z.object({
   CONNECTION_RATE_LIMIT: z.string().transform(Number).pipe(z.number().int().min(3).max(20)).default('5'),
   CONNECTION_RATE_WINDOW_SECONDS: z.string().transform(Number).pipe(z.number().int().min(30).max(300)).default('60'),
   CONNECTION_RATE_LOCK_SECONDS: z.string().transform(Number).pipe(z.number().int().min(30).max(300)).default('60'),
+  
+  // Maintenance and Drain Mode
+  DRAIN_MODE_ENABLED: z.string().transform(val => val === 'true').default('false'),
+  MAINTENANCE_MODE_ENABLED: z.string().transform(val => val === 'true').default('false'),
 
   // Rate Limiting
   CHAT_RATE_LIMIT: z.string().transform(Number).pipe(z.number().int().min(5).max(100)).default('20'),
