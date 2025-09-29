@@ -66,7 +66,7 @@ As a player, I want to log into the tile game backend, join or create a group or
 6. **Given** two players with mutual communication permissions, **When** one sends a private message, **Then** only the target player receives it and delivery success or failure is known to the sender.
 7. **Given** a player disconnects temporarily during an instanced battle, **When** they reconnect within a defined timeout window [NEEDS CLARIFICATION: reconnection grace period], **Then** they resume the same instance state (tile layout, position, pending effects) without data loss.
 8. **Given** a battle instance reaches its end condition (e.g., objective met), **When** the end condition is detected, **Then** final results (scores, outcomes, rewards) are produced and persisted for later retrieval.
-9. **Given** system load of hundreds of concurrent players across multiple instances, **When** standard gameplay actions occur (tile placement, chat messages), **Then** system maintains performance within defined service level targets [NEEDS CLARIFICATION: throughput, latency, error rate targets].
+9. **Given** system load of up to ~1,000 concurrent connected players across multiple active instances, **When** standard gameplay actions occur (tile placement, chat messages), **Then** the system maintains performance within defined service level targets (to be specified: latency, throughput, error rate) without degradation beyond those thresholds.
 
 ### Edge Cases
 - Single-player scenario: player starts solo instance and immediately ends (ensure lifecycle still recorded).
@@ -98,7 +98,7 @@ As a player, I want to log into the tile game backend, join or create a group or
 - **FR-014**: System MUST prevent players from performing in-instance actions if they are no longer active participants (e.g., removed, disconnected past grace period, instance ended).
 - **FR-015**: System MUST provide a mechanism to end an instance when victory/defeat or other termination condition is reached and transition all participants to a post-instance state.
 - **FR-016**: System MUST protect privacy of private messages so that only intended recipients can access their content [NEEDS CLARIFICATION: retention & audit policies].
-- **FR-017**: System MUST support scalable concurrent operation for "hundreds" of simultaneous players across multiple instances [NEEDS CLARIFICATION: precise concurrency target and scalability KPIs].
+- **FR-017**: System MUST support scalable concurrent operation sustaining ~1,000 simultaneous connected players across multiple instances in the initial release (future scalability beyond this may be addressed in later features); associated KPIs (latency, error rate, throughput) to be defined in subsequent clarification.
 - **FR-018**: System MUST apply rate limiting and/or anti-spam controls for chat and action submissions [NEEDS CLARIFICATION: thresholds and penalty behaviors].
 - **FR-019**: System MUST log critical game events (instance creation, completion, rule violations, moderation events) for auditing and debugging [NEEDS CLARIFICATION: log retention period].
 - **FR-020**: System MUST ensure that conflicting tile placement attempts affecting the same location are resolved deterministically with a defined precedence rule [NEEDS CLARIFICATION: precedence criteria].
@@ -109,6 +109,11 @@ As a player, I want to log into the tile game backend, join or create a group or
 - **FR-025**: System MUST provide a standardized error code schema for rejected player actions and failed message deliveries [NEEDS CLARIFICATION: schema structure].
 
 *Ambiguities & Clarifications required are explicitly marked; no implementation technology is specified.*
+
+## Clarifications
+
+### Session 2025-09-29
+- Q: What peak concurrent connected player scale should the backend handle in the initial release? → A: ~1,000 concurrent players (Option B)
 
 ### Key Entities *(include if feature involves data)*
 - **Player**: Represents an individual user participating in gameplay. Attributes (conceptual): unique identifier, display name, guild membership(s?) [NEEDS CLARIFICATION: multi-guild allowed?], current group, current instance (nullable), connection status.
