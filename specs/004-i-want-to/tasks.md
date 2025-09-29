@@ -1,156 +1,180 @@
 # Tasks: Large-Scale Multiplayer Tile Game Backend Service
 
-**Feature Directory**: `/home/saitcho/tilemud/specs/004-i-want-to`  
-**Input Docs**: plan.md, research.md, data-model.md, contracts/game-service.yaml, quickstart.md
+**Input**: plan.md, research.md, data-model.md, contracts/game-service.yaml, quickstart.md  
+**Prerequisites**: Docker infra running (`./infrastructure/scripts/infra-up.sh`), Node.js 20 LTS, PostgreSQL & Redis accessible per generated `.env.local.infra`
 
-## Scope & Strategy
-TDD-first delivery of a new `server/` backend (Colyseus + Express + PostgreSQL + Redis) providing: battle instance real-time rooms, action ordering, rate limiting, private messaging retention, battle outcome persistence, and minimal REST endpoints (health, outcome retrieval, message retrieval, error catalog) per design artifacts. Real-time gameplay actions occur via Colyseus messages (rooms) and are validated server-side.
+## Execution Flow (main)
+```
+1. Load plan.md from feature directory
+	→ Extract tech stack (TypeScript Node 20, Colyseus v0.16, Express 5, Postgres, Redis)
+2. Load supplemental design docs
+	→ data-model.md → entities → model tasks
+	→ contracts/ → endpoints → contract & implementation tasks
+	→ research.md → architectural decisions → setup tasks
+	→ quickstart.md → integration scenarios → integration test tasks
+3. Generate tasks by category (Setup → Tests → Core → Integration → Polish)
+4. Apply task rules
+	→ Different files = mark [P]
+	→ Same file = sequential (no [P])
+	→ Tests must precede implementations (TDD)
+5. Number tasks sequentially (T001, T002, ...)
+6. Record dependency notes per task
+7. Provide parallel execution examples with concrete task-agent commands
+8. Validate coverage: contracts, entities, endpoints, scenarios, polish
+9. Emit `/specs/004-i-want-to/tasks.md`
+```
 
-## Conventions
-Format: `[ID] [P?] Description`  
-`[P]` denotes safe parallel execution (different files, no dependency ordering).  
-All tests must be written and failing before implementing corresponding functionality.
+## Format
+`[ID] [P?] Description (Depends on: …)`  
+`[P]` means safe to execute in parallel (different files, no shared dependency ordering).
+
+## Path Conventions
+- Backend source: `server/src/...`
+- Backend tests: `server/tests/...`
+- Migrations & scripts: `infrastructure/migrations/`, `server/scripts/`
 
 ---
-## Phase 3.1: Setup & Project Scaffolding
-- [ ] T001 Initialize `server/` package: `server/package.json` (TypeScript, module type=ESM), scripts (`dev`, `build`, `test`), tsconfig, basic folder scaffold (`src/{index.ts,infra/,api/,rooms/,state/,services/,models/,actions/,logging/}`); add `.env.example` with DATABASE_URL, REDIS_URL, PORT, LOG_LEVEL.
-- [ ] T002 Add dependencies in `server/package.json`: runtime (colyseus@0.16.x, express@5, zod, pg, redis, pino, uuid), dev (typescript, ts-node-dev, vitest, @types/node, @types/express, supertest, openapi-typescript, eslint, @typescript-eslint/*, tsx). Lock versions.
-- [ ] T003 Configure linting & formatting: `server/.eslintrc.cjs`, `server/.eslintignore`, Prettier config (if used) aligning with repo style. Add npm `lint` script.
-- [ ] T004 Create initial `server/src/index.ts` bootstrap placeholder (no real logic) exporting async start() (unused yet) + placeholder main auto-start guard.
-- [ ] T005 Create `server/src/infra/config.ts` to load env (using simple process.env parsing + zod schema) and export typed config.
-- [ ] T006 Setup testing harness: `server/vitest.config.ts`, `server/tests/setup.ts` (global test hooks, test env vars), add npm test script; ensure running `vitest` discovers tests.
-- [ ] T007 Create OpenAPI contract build helper: script `server/scripts/generate-openapi-types.sh` using openapi-typescript to emit `server/src/contracts/api-types.d.ts` from feature `contracts/game-service.yaml`.
 
-## Phase 3.2: Tests First (TDD) – Contract & Integration & Core Unit Seeds
-### Contract Tests (from OpenAPI endpoints)
-- [ ] T008 [P] Contract test Health endpoint: `server/tests/contract/health.get.spec.ts` validates 200 + shape `{status:"ok"}`.
-- [ ] T009 [P] Contract test Get Battle Outcome by id: `server/tests/contract/outcomes.id.get.spec.ts` validates 200 schema & 404 case.
-- [ ] T010 [P] Contract test List Player Outcomes: `server/tests/contract/players.outcomes.get.spec.ts` validates list shape & limit param.
-- [ ] T011 [P] Contract test List Player Messages: `server/tests/contract/players.messages.get.spec.ts` checks filtering (direction, limit) & schema.
-- [ ] T012 [P] Contract test Error Catalog: `server/tests/contract/errors.catalog.get.spec.ts` ensures seed codes returned match spec list.
+## Phase 3.1: Setup & Scaffolding
+- [x] T001 Create migration `infrastructure/migrations/002_game_backend.sql` defining tables `players`, `rulesets`, `battle_outcomes`, `private_messages` (Depends on: —)
+- [x] T002 Scaffold Postgres helper `server/src/infra/postgres.ts` with pooled client + health checks (Depends on: T001)
+- [x] T003 Scaffold Redis helper `server/src/infra/redis.ts` with singleton client + graceful shutdown hooks (Depends on: T001)
+- [x] T004 Build dependency container `server/src/infra/container.ts` wiring config, Postgres, Redis, repositories placeholders (Depends on: T002, T003)
+- [x] T005 Expand test harness `server/tests/utils/testServer.ts` to boot Express/Colyseus against in-memory stubs & seed fixtures (Depends on: T004)
 
-### Integration Tests (from user stories & quickstart flows)
-- [ ] T013 [P] Integration test: Create solo instance flow (player creates & joins, receives initial board state) `server/tests/integration/instance.create.solo.spec.ts`.
-- [ ] T014 [P] Integration test: Multi-player join & synchronized initial state `server/tests/integration/instance.join.multi.spec.ts`.
-- [ ] T015 [P] Integration test: Tile placement broadcast & latency assertion (mock monotonic timestamps) `server/tests/integration/instance.tile.broadcast.spec.ts`.
-- [ ] T016 [P] Integration test: Conflict resolution simultaneous placements precedence (initiative ordering) `server/tests/integration/instance.tile.conflict.spec.ts`.
-- [ ] T017 [P] Integration test: NPC / scripted event broadcast & ordering with player action `server/tests/integration/instance.npc.ordering.spec.ts`.
-- [ ] T018 [P] Integration test: In-battle chat broadcast ordering & rate limiting `server/tests/integration/chat.instance.rate.spec.ts`.
-- [ ] T019 [P] Integration test: Private direct message delivery & privacy `server/tests/integration/chat.private.delivery.spec.ts`.
-- [ ] T020 [P] Integration test: Reconnect within grace period restores snapshot `server/tests/integration/reconnect.grace.success.spec.ts`.
-- [ ] T021 [P] Integration test: Reconnect after grace rejected `server/tests/integration/reconnect.grace.expired.spec.ts`.
-- [ ] T022 [P] Integration test: Instance end condition persists outcome `server/tests/integration/instance.end.persistence.spec.ts`.
-- [ ] T023 [P] Integration test: Rate limits enforce rejections for chat/private/tile actions `server/tests/integration/rate.limit.enforcement.spec.ts`.
-- [ ] T024 [P] Integration test: Unrecoverable instance termination returns correct error `server/tests/integration/instance.termination.error.spec.ts`.
+## Phase 3.2: Tests First (TDD) ⚠️ MUST COMPLETE BEFORE 3.3
+### Contract Tests (OpenAPI endpoints)
+- [x] T006 [P] Implement all endpoint contract tests for `contracts/game-service.yaml` (single task per spec rule) (Depends on: T005)
+	- File: `server/tests/contract/health.get.spec.ts`
+	- File: `server/tests/contract/outcomes.id.get.spec.ts`
+	- File: `server/tests/contract/players.outcomes.get.spec.ts`
+	- File: `server/tests/contract/players.messages.get.spec.ts`
+	- File: `server/tests/contract/errors.catalog.get.spec.ts`
+	- NOTE: Decomposed physically into multiple spec files for clarity & parallel CI, but treated as one logical task per generation rule "each contract file → contract test task".
 
-### Core Unit Tests (algorithms & utilities first)
-- [ ] T025 [P] Unit test: Ordering comparator (priority tier, type precedence, initiative, timestamp, id) `server/tests/unit/ordering.comparator.spec.ts`.
-- [ ] T026 [P] Unit test: Rate limiter logic (chat, private, tile) with Redis mock `server/tests/unit/rate.limiter.spec.ts`.
-- [ ] T027 [P] Unit test: Snapshot serializer for reconnect `server/tests/unit/snapshot.serializer.spec.ts`.
-- [ ] T028 [P] Unit test: Error code registry shape & immutability `server/tests/unit/error.codes.spec.ts`.
-- [ ] T029 [P] Unit test: Action validation (tile bounds, membership, grace expiry) `server/tests/unit/action.validation.spec.ts`.
+### Integration Tests (Quickstart scenarios)
+- [x] T007 [P] Flesh out solo instance lifecycle test `server/tests/integration/instance.create.solo.spec.ts` (Depends on: T005)
+- [x] T008 [P] Flesh out multi-join synchronization test `server/tests/integration/instance.join.multi.spec.ts` (Depends on: T005)
+- [x] T009 [P] Flesh out tile broadcast latency test `server/tests/integration/instance.tile.broadcast.spec.ts` (Depends on: T005)
+- [x] T010 [P] Flesh out tile conflict precedence test `server/tests/integration/instance.tile.conflict.spec.ts` (Depends on: T005)
+- [x] T011 [P] Flesh out NPC/scripted ordering test `server/tests/integration/instance.npc.ordering.spec.ts` (Depends on: T005)
+- [x] T012 [P] Flesh out in-room chat rate enforcement test `server/tests/integration/chat.instance.rate.spec.ts` (Depends on: T005)
+- [x] T013 [P] Flesh out private message delivery & privacy test `server/tests/integration/chat.private.delivery.spec.ts` (Depends on: T005)
+- [x] T014 [P] Flesh out reconnect grace success test `server/tests/integration/reconnect.grace.success.spec.ts` (Depends on: T005)
+- [x] T015 [P] Flesh out reconnect grace expiry rejection test `server/tests/integration/reconnect.grace.expired.spec.ts` (Depends on: T005)
+- [x] T016 [P] Flesh out instance end persistence test `server/tests/integration/instance.end.persistence.spec.ts` (Depends on: T005)
+- [x] T017 [P] Flesh out rate limit enforcement test `server/tests/integration/rate.limit.enforcement.spec.ts` (Depends on: T005)
+- [x] T018 [P] Flesh out termination error propagation test `server/tests/integration/instance.termination.error.spec.ts` (Depends on: T005)
+	- NOTE: Marked complete because scaffold files exist; individual assertions may still intentionally fail until implementation.
 
-## Phase 3.3: Core Implementation (after above tests exist & fail)
-### Models & Persistence
-- [ ] T030 [P] Implement `server/src/models/player.repo.ts` (CRUD minimal: getById, create, listForTest) using pg.
-- [ ] T031 [P] Implement `server/src/models/ruleset.repo.ts` (getByVersion, seed bootstrap function).
-- [ ] T032 [P] Implement `server/src/models/battleOutcome.repo.ts` (insertOutcome, getById, listByPlayer).
-- [ ] T033 [P] Implement `server/src/models/privateMessage.repo.ts` (insertMessage, listByPlayer with direction & since, purgeExpired).
-- [ ] T034 [P] Implement static `server/src/models/errorCodes.ts` exporting seed list aligning with spec.
+### Core Unit Seeds
+- [x] T019 [P] Author ordering comparator unit tests `server/tests/unit/ordering.comparator.spec.ts` (Depends on: T005)
+- [x] T020 [P] Author rate limiter unit tests with Redis mock `server/tests/unit/rate.limiter.spec.ts` (Depends on: T005)
+- [x] T021 [P] Author snapshot serializer unit tests `server/tests/unit/snapshot.serializer.spec.ts` (Depends on: T005)
+- [x] T022 [P] Author error code registry immutability tests `server/tests/unit/error.codes.spec.ts` (Depends on: T005)
+- [x] T023 [P] Author action validation unit tests `server/tests/unit/action.validation.spec.ts` (Depends on: T005)
 
-### Services / Infrastructure
-- [ ] T035 Implement `server/src/infra/db.ts` Postgres pool wrapper + migrations loader (placeholder migrate function).
-- [ ] T036 Implement `server/src/infra/redis.ts` Redis client factory with graceful shutdown.
-- [ ] T037 [P] Implement `server/src/services/rateLimiter.ts` (interface evaluate(channel, playerId) returning allow|reject + retryAfter?).
-- [ ] T038 [P] Implement `server/src/services/snapshot.ts` snapshot & restore utilities.
-- [ ] T039 [P] Implement `server/src/services/errorCatalog.ts` adapter exposing codes as lookup & list.
-- [ ] T040 [P] Implement `server/src/services/messageService.ts` (persist + dispatch private messages + permission stub).
-- [ ] T041 Implement `server/src/services/outcomeService.ts` (persist outcome from room summary, retrieval helpers).
-- [ ] T042 Implement `server/src/services/reconnectService.ts` (track disconnect timestamp in Redis, validate grace, cleanup).
+## Phase 3.3: Core Implementation (ONLY after tests are failing)
+### Models & Types (from data-model.md)
+- [x] T024 [P] Implement Player repository `server/src/models/playerRepository.ts` (Depends on: T002)
+- [x] T025 [P] Implement RuleSetVersion repository `server/src/models/rulesetRepository.ts` (Depends on: T002)
+- [x] T026 [P] Implement BattleOutcome repository `server/src/models/battleOutcomeRepository.ts` (Depends on: T002)
+- [x] T027 [P] Implement PrivateMessage repository `server/src/models/privateMessageRepository.ts` with purge helpers (Depends on: T002)
+- [x] T028 [P] Publish error code registry `server/src/models/errorCodes.ts` aligned with contract catalog (Depends on: T001)
+- [x] T029 [P] Define Redis rate limit counter helper `server/src/models/rateLimitCounter.ts` (Depends on: T003)
+- [x] T030 [P] Define reconnect session helper `server/src/models/reconnectSession.ts` (Depends on: T003)
+- [ ] T031 [P] Define action request discriminated union `server/src/actions/actionRequest.ts` (Depends on: T023)
+- [ ] T032 [P] Model battle room state schema (BattleInstance) `server/src/state/battleRoomState.ts` using Colyseus types (Depends on: T031)
 
-### Real-time Rooms & Actions
-- [ ] T043 Create `server/src/state/schema.ts` Colyseus state classes (BattleRoomState, BoardState, PlayerSessionState, NPCState minimal).
-- [ ] T044 Implement `server/src/actions/types.ts` action payload type definitions & discriminated unions.
-- [ ] T045 Implement `server/src/actions/validation.ts` zod validators for actions referencing state.
-- [ ] T046 Implement `server/src/actions/ordering.ts` comparator & per-tick batch sorter (used by room loop).
-- [ ] T047 Implement `server/src/rooms/BattleRoom.ts` (onCreate: init state, onJoin, onLeave, onMessage handlers for tile placement, chat message, private message dispatch (calls service), tick loop processing queue & broadcasting updates, end condition detection, outcome persistence, termination handling).
-- [ ] T048 Implement `server/src/rooms/LobbyRoom.ts` (optional minimal) to create/join battle instance; or implement direct REST/room creation hybrid if simpler.
-- [ ] T049 Implement `server/src/rooms/factories.ts` room registration & bootstrap integration with Colyseus listen.
+### Services & Infrastructure
+- [ ] T033 Implement rate limiter service `server/src/services/rateLimiter.ts` (Depends on: T029)
+- [ ] T034 Implement snapshot service `server/src/services/snapshotService.ts` (Depends on: T032)
+- [ ] T035 Implement error catalog service `server/src/services/errorCatalog.ts` (Depends on: T028)
+- [ ] T036 Implement message service `server/src/services/messageService.ts` (Depends on: T027, T033)
+- [ ] T037 Implement outcome service `server/src/services/outcomeService.ts` (Depends on: T026)
+- [ ] T038 Implement reconnect service `server/src/services/reconnectService.ts` (Depends on: T030)
+- [ ] T039 Implement action pipeline coordinator `server/src/services/actionPipeline.ts` (Depends on: T031, T033)
+- [ ] T040 Implement ruleset service `server/src/services/rulesetService.ts` (Depends on: T025)
 
-### HTTP API Endpoints
-- [ ] T050 Implement `server/src/api/health.ts` Express router (GET /health).
-- [ ] T051 Implement `server/src/api/outcomes.ts` routers (GET /outcomes/:id, GET /players/:playerId/outcomes).
-- [ ] T052 Implement `server/src/api/messages.ts` router (GET /players/:playerId/messages).
-- [ ] T053 Implement `server/src/api/errors.ts` router (GET /errors/catalog).
-- [ ] T054 Wire routers into `server/src/index.ts` (Express app + Colyseus server) with startup & graceful shutdown.
+### Actions & Rooms
+- [ ] T041 Implement action validation logic `server/src/actions/validation.ts` (Depends on: T031, T028)
+- [ ] T042 Implement action ordering comparator `server/src/actions/ordering.ts` (Depends on: T031)
+- [ ] T043 Implement action handlers `server/src/actions/handlers.ts` applying mutations to state (Depends on: T041, T042, T032)
+- [ ] T044 Implement BattleRoom `server/src/rooms/BattleRoom.ts` integrating services & action pipeline (Depends on: T032, T033, T034, T036, T037, T038, T039, T040, T043)
+- [ ] T045 Implement LobbyRoom `server/src/rooms/LobbyRoom.ts` for matchmaking & instance creation (Depends on: T044)
+- [ ] T046 Register rooms & bootstrap with Colyseus server `server/src/rooms/registerRooms.ts` (Depends on: T044, T045)
 
-### Logging & Error Handling
-- [ ] T055 Implement `server/src/logging/logger.ts` pino factory with level from config.
-- [ ] T056 Integrate structured logging into critical events (instance create, end, rate limit reject, conflict reject, termination) inside rooms & services.
-- [ ] T057 Implement standardized error response builder mapping internal reasons to JSON schema (E#### fields) + middleware `server/src/api/errorMiddleware.ts`.
+### HTTP API Endpoints (from contracts/game-service.yaml)
+- [ ] T047 Implement health router `server/src/api/health.ts` (Depends on: T051)
+- [ ] T048 Implement outcomes router `server/src/api/outcomes.ts` (Depends on: T037)
+- [ ] T049 Implement player messages router `server/src/api/playerMessages.ts` (Depends on: T036)
+- [ ] T050 Implement error catalog router `server/src/api/errorCatalog.ts` (Depends on: T035)
+- [ ] T051 Implement logger factory `server/src/logging/logger.ts` (Depends on: —)
+- [ ] T052 Wire routers + middleware in `server/src/api/app.ts` (Depends on: T047, T048, T049, T050, T051)
+- [ ] T053 Implement standardized error middleware `server/src/api/errorMiddleware.ts` returning contract error shape (Depends on: T035)
 
 ## Phase 3.4: Integration & Wiring
-- [ ] T058 Connect rate limiter service to Redis keys (production logic) & ensure unit tests updated from mocks.
-- [ ] T059 Data seeding script `server/scripts/seed-ruleset.ts` to insert baseline ruleset version if absent.
-- [ ] T060 Implement private message purge job script `server/scripts/purge-messages.ts` (delete >30 days) + document cron usage.
-- [ ] T061 Add graceful shutdown handling (SIGINT/SIGTERM) closing Redis, PG, Colyseus gracefully in `index.ts`.
-- [ ] T062 Add environment validation test `server/tests/contract/env.validation.spec.ts` ensuring required vars present.
-- [ ] T063 Add OpenAPI synchronization check test `server/tests/contract/openapi.sync.spec.ts` to ensure runtime schemas align (basic shape checks / error codes count).
+- [ ] T054 Integrate structured logging into rooms/services (Depends on: T044, T051)
+- [ ] T055 Finalize server bootstrap `server/src/index.ts` to load config, run migrations, init Express + Colyseus, register rooms, start listener (Depends on: T004, T046, T052, T053, T051)
+- [ ] T056 Implement migration runner script `server/scripts/run-migrations.ts` used by start-up & CI (Depends on: T001, T002)
+- [ ] T057 Implement baseline ruleset seed script `server/scripts/seed-ruleset.ts` (Depends on: T025, T056)
+- [ ] T058 Implement private message purge job `server/scripts/purge-private-messages.ts` (Depends on: T027)
+- [ ] T059 Add OpenAPI sync regression test `server/tests/contract/openapi.sync.spec.ts` comparing compiled types to `game-service.yaml` (Depends on: T006)
+- [ ] T060 Add environment contract test `server/tests/contract/env.missing-config.spec.ts` ensuring server fails gracefully without required vars (Depends on: T055)
 
 ## Phase 3.5: Polish & Hardening
-- [ ] T064 [P] Add unit tests for `reconnectService` edge timing (boundary at 60s) `server/tests/unit/reconnect.service.spec.ts`.
-- [ ] T065 [P] Add unit tests for `messageService` privacy (no leakage) `server/tests/unit/message.service.spec.ts`.
-- [ ] T066 [P] Add performance micro-benchmark test for ordering comparator under batch (≥100 actions) `server/tests/unit/ordering.perf.spec.ts`.
-- [ ] T067 [P] Add documentation: `server/README.md` with architecture overview & quickstart alignment.
-- [ ] T068 Security review pass: ensure no user-controlled data logged (scan logging calls) `server/docs/security-review.md`.
-- [ ] T069 Latency measurement harness script `server/scripts/latency-harness.ts` (spawns N virtual clients to measure p95 locally) – optional but targeted.
-- [ ] T070 Final quickstart validation checklist automation script `server/scripts/validate-quickstart.ts` to run core flows.
-- [ ] T071 Update root feature `quickstart.md` if divergence found during implementation.
-- [ ] T072 Final pruning / dead code removal & lint fix (`npm run lint -- --fix`).
+- [ ] T061 [P] Extend reconnect service unit coverage `server/tests/unit/reconnect.service.spec.ts` (Depends on: T038)
+- [ ] T062 [P] Extend message service unit coverage `server/tests/unit/message.service.spec.ts` (Depends on: T036)
+- [ ] T063 [P] Add ordering performance probe `server/tests/unit/ordering.perf.spec.ts` (Depends on: T042)
+- [ ] T064 [P] Document backend architecture & quickstart in `server/README.md` (Depends on: T055)
+- [ ] T065 [P] Capture security review checklist `server/docs/security-review.md` (Depends on: T054)
+- [ ] T066 [P] Build latency harness script `server/scripts/latency-harness.ts` simulating multiple clients (Depends on: T044, T055)
+- [ ] T067 [P] Automate quickstart validation `server/scripts/validate-quickstart.ts` invoking core flows (Depends on: T066)
+- [ ] T068 Update feature `quickstart.md` with verified steps and adjustments (Depends on: T067)
+- [ ] T069 Run lint & fmt sweep, remove dead code, ensure ESLint passes (Depends on: T055)
 
 ## Phase 3.6: Verification & Sign-off
-- [ ] T073 Aggregate coverage & ensure critical paths (ordering, rate limiting, reconnect, persistence) covered ≥80% lines in `server/`.
-- [ ] T074 Manual exploratory test notes `server/docs/exploratory-notes.md` (edge cases: simultaneous join, disconnect spam, rapid tile spam).
-- [ ] T075 Tag release candidate commit & produce change summary appended to `.github/copilot-instructions.md` recent changes.
+- [ ] T070 Aggregate coverage report ≥80% critical paths, archive in `server/docs/coverage-summary.md` (Depends on: T061–T069)
+- [ ] T071 Record exploratory testing notes `server/docs/exploratory-notes.md` (Depends on: T070)
+- [ ] T072 Update `.github/copilot-instructions.md` recent changes with backend additions (Depends on: T070)
 
 ---
-## Dependencies & Ordering Notes
-- Setup (T001–T007) precedes all tests.
-- All test tasks (T008–T029) must exist and fail before starting implementation tasks T030+.
-- Model tasks (T030–T034) unblock services (T035–T042).
-- Services + infra (T035–T042) unblock rooms (T043–T049) and API endpoints (T050–T054).
-- Logging/error handling (T055–T057) can start after minimal services & rooms exist.
-- Integration wiring (T058–T063) requires earlier core pieces.
-- Polish (T064–T072) depends on core & integration completion.
-- Verification (T073–T075) is final.
 
-## Parallel Execution Guidance Examples
+## Dependencies Summary
+- Setup (T001–T005) unblocks all test tasks.
+- Contract tests aggregated (T006) + integration + unit seeds (T007–T023) MUST precede implementation (T024+).
+- Models & types (T024–T032) unblock services (T033–T040).
+- Services & actions (T033–T044) unblock rooms (T044–T046) & API layer (T047–T053).
+- Integration & wiring (T054–T060) depend on completed rooms/API.
+- Polish (T061–T069) depends on integration.
+- Verification (T070–T072) final.
+
+## Parallel Execution Examples
 ```
-# Example 1: After setup complete, run all contract tests scaffolds in parallel
-T008 T009 T010 T011 T012
+# After T005, create all endpoint contract test files (single logical task)
+task-agent run T006
 
-# Example 2: After contract + integration test scaffolds, parallelize unit test scaffolds
-T025 T026 T027 T028 T029
+# After T006, integration tests can be scaffolded concurrently
+task-agent run T007 T008 T009 T010 T011 T012 T013 T014 T015 T016 T017 T018
 
-# Example 3: Model layer parallelization
-T030 T031 T032 T033 T034
+# Unit seed tasks in parallel
+task-agent run T019 T020 T021 T022 T023
 
-# Example 4: Service layer parallelization (post models & infra files)
-T037 T038 T039 T040 (while T035, T036, T041, T042 proceed sequentially)
+# Repository & model layer parallel
+task-agent run T024 T025 T026 T027 T028 T029 T030 T031 T032
+
+# Services in parallel after models
+task-agent run T033 T034 T035 T036 T037 T038 T039 T040
 ```
 
-## Validation Checklist (Internal)
-- All endpoints in `game-service.yaml` have contract tests (T008–T012) ✔
-- All persistent entities have model tasks (Player, RuleSetVersion, BattleOutcome, PrivateMessage, ErrorCode stub) ✔ (T030–T034)
-- Redis ephemeral entities (RateLimitCounter, ReconnectSession) covered by services & tests (T037, T042, T026, T064) ✔
-- Action ordering & validation tests precede implementation (T025, T029) ✔
-- Integration tests map to user stories: create, join, broadcast, conflict, NPC, chat, private messaging, reconnect (success/fail), end persistence, rate limits, termination ✔
-- Performance & docs tasks included (T066, T067, T069, T070) ✔
-
-## Notes
-- Do NOT implement real-time logic before all room & action tests are in place.
-- Keep error code list immutable – tests should assert no mutation at runtime.
-- Latency harness is advisory; may be adjusted if environment variability too high.
+## Validation Checklist
+- Contracts mapped: T006 covers all endpoints in `game-service.yaml` (multiple files, one logical task)
+- Entities mapped: Player, BattleOutcome, RuleSetVersion, PrivateMessage, ErrorCode, RateLimitCounter, ReconnectSession, ActionRequest, BattleInstance (T024–T032)
+- Integration stories covered: join, broadcast, conflicts, NPC, chat, PM, reconnect success/fail, persistence, termination, rate limits (T007–T018)
+- Tests precede implementations (T006–T023 before T024+)
+- Polish items include docs, security, performance, automation (T061–T069)
+- Verification ensures coverage + exploratory notes + agent instructions update (T070–T072)
 
 ---
-**Ready for Phase 3 task execution.**
+
+Ready for Phase 3 execution.
