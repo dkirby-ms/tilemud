@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useLogout } from '../../src/features/auth/useLogout';
 import { useFocusedDirtyGuard } from '../../src/hooks/useFocusedDirtyGuard';
+import { TestAuthWrapper } from '../utils/testAuthWrapper';
 
 describe('Unsaved Changes Guard Integration', () => {
   beforeEach(() => {
@@ -10,7 +11,9 @@ describe('Unsaved Changes Guard Integration', () => {
 
   it('should show confirmation dialog when focused field is dirty', async () => {
     // TODO: Mock focused dirty field scenario
-    const { result: logoutResult } = renderHook(() => useLogout());
+    const { result: logoutResult } = renderHook(() => useLogout(), {
+      wrapper: TestAuthWrapper
+    });
     const { result: guardResult } = renderHook(() => useFocusedDirtyGuard());
 
     // TODO: Set up dirty field state
@@ -26,7 +29,9 @@ describe('Unsaved Changes Guard Integration', () => {
   });
 
   it('should cancel logout when user cancels confirmation', async () => {
-    const { result } = renderHook(() => useLogout());
+    const { result } = renderHook(() => useLogout(), {
+      wrapper: TestAuthWrapper
+    });
     
     // Mock user canceling confirmation
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
@@ -40,7 +45,9 @@ describe('Unsaved Changes Guard Integration', () => {
   });
 
   it('should proceed with logout when user confirms', async () => {
-    const { result } = renderHook(() => useLogout());
+    const { result } = renderHook(() => useLogout(), {
+      wrapper: TestAuthWrapper
+    });
     
     // Mock user confirming
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);

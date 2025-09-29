@@ -1,10 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
 import { useLogout } from '../../src/features/auth/useLogout';
 import { renderHook } from '@testing-library/react';
+import { TestAuthWrapper } from '../utils/testAuthWrapper';
 
 describe('Logout Idempotency', () => {
   it('should handle rapid double logout invocation without errors', async () => {
-    const { result } = renderHook(() => useLogout());
+    const { result } = renderHook(() => useLogout(), {
+      wrapper: TestAuthWrapper,
+    });
     
     // TODO: This test ensures logout can be called multiple times safely
     const logoutFn = result.current.logout;
@@ -25,7 +28,9 @@ describe('Logout Idempotency', () => {
   });
 
   it('should be a no-op on subsequent calls after first logout', async () => {
-    const { result } = renderHook(() => useLogout());
+    const { result } = renderHook(() => useLogout(), {
+      wrapper: TestAuthWrapper,
+    });
     
     // TODO: Verify subsequent calls are no-ops (FR-06)
     const logoutFn = result.current.logout;

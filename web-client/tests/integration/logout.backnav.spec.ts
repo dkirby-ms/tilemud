@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { useLogout } from '../../src/features/auth/useLogout';
+import { TestAuthWrapper } from '../utils/testAuthWrapper';
 
 describe('Back Navigation Protection Integration', () => {
   let mockHistoryBack: ReturnType<typeof vi.spyOn>;
@@ -29,7 +30,9 @@ describe('Back Navigation Protection Integration', () => {
   });
 
   it('should prevent showing protected content after back navigation', async () => {
-    const { result } = renderHook(() => useLogout());
+    const { result } = renderHook(() => useLogout(), {
+      wrapper: TestAuthWrapper,
+    });
 
     // Simulate being on protected route
     mockLocation.pathname = '/dashboard';
@@ -47,7 +50,9 @@ describe('Back Navigation Protection Integration', () => {
   });
 
   it('should clear sensitive data before allowing navigation', async () => {
-    const { result } = renderHook(() => useLogout());
+    const { result } = renderHook(() => useLogout(), {
+      wrapper: TestAuthWrapper,
+    });
 
     await result.current.logout({ skipConfirmation: true });
 
@@ -57,7 +62,9 @@ describe('Back Navigation Protection Integration', () => {
   });
 
   it('should maintain public landing after back navigation from logout', async () => {
-    const { result } = renderHook(() => useLogout());
+    const { result } = renderHook(() => useLogout(), {
+      wrapper: TestAuthWrapper,
+    });
 
     // Start on protected route
     mockLocation.pathname = '/dashboard';

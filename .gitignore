@@ -1,4 +1,45 @@
+# Web client environment files
 web-client/.env
-server/node_modules
-server/dist
+
+# Infrastructure generated files
+.env.local.infra
+.migration-ready
+
+# Infrastructure state (should be regenerated)
+infrastructure/migrations/ledger.json
+infrastructure/migrations/state/
+
+# Backup files
+*.backup.*
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Node.js (if backend is added later)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Logs
+logs
+*.log
 
