@@ -70,7 +70,7 @@ As a player, I want to log into the tile game backend, join or create a group or
 
 ### Edge Cases
 - Single-player scenario: player starts solo instance and immediately ends (ensure lifecycle still recorded).
-- Simultaneous tile placements targeting same board cell by different players (conflict resolution ordering) [NEEDS CLARIFICATION: conflict resolution rule].
+- Simultaneous tile placements targeting same board cell by different players are resolved by predetermined player initiative order (higher priority wins; losers receive rejection with precedence reason).
 - Player attempts action in an instance they are no longer part of (should be rejected with an explanatory reason).
 - NPC scripted event collides with a player move in the same tick [NEEDS CLARIFICATION: server-side sequencing priority].
 - Chat spam or rate limit exceed events [NEEDS CLARIFICATION: message rate limits].
@@ -101,7 +101,7 @@ As a player, I want to log into the tile game backend, join or create a group or
 - **FR-017**: System MUST support scalable concurrent operation sustaining ~1,000 simultaneous connected players across multiple instances in the initial release (future scalability beyond this may be addressed in later features); associated KPIs (latency, error rate, throughput) to be defined in subsequent clarification.
 - **FR-018**: System MUST apply rate limiting and/or anti-spam controls for chat and action submissions [NEEDS CLARIFICATION: thresholds and penalty behaviors].
 - **FR-019**: System MUST log critical game events (instance creation, completion, rule violations, moderation events) for auditing and debugging [NEEDS CLARIFICATION: log retention period].
-- **FR-020**: System MUST ensure that conflicting tile placement attempts affecting the same location are resolved deterministically with a defined precedence rule [NEEDS CLARIFICATION: precedence criteria].
+- **FR-020**: System MUST ensure that conflicting tile placement attempts affecting the same location are resolved deterministically using a predefined player initiative priority order (higher initiative wins; all losing actions are rejected with a standardized precedence-conflict error code).
 - **FR-021**: System MUST supply a consistent snapshot of instance state to reconnecting players.
 - **FR-022**: System MUST reject cross-instance interaction attempts (e.g., tile placement referencing another instance ID) with an error.
 - **FR-023**: System MUST provide guild and group membership change propagation to relevant online players within a target latency [NEEDS CLARIFICATION: latency target].
@@ -116,9 +116,10 @@ As a player, I want to log into the tile game backend, join or create a group or
 - Q: What peak concurrent connected player scale should the backend handle in the initial release? → A: ~1,000 concurrent players (Option B)
 - Q: What end-to-end latency targets for tile placement propagation and chat delivery? → A: Tile ≤150ms p95, Chat ≤150ms p95 (Option A)
 - Q: What is the maximum number of players allowed in a single battle instance? → A: 32 players (Option D)
+- Q: When simultaneous tile placements target the same cell how is precedence resolved? → A: Player initiative priority order (Option B)
 
 ### Key Entities *(include if feature involves data)*
-- **Player**: Represents an individual user participating in gameplay. Attributes (conceptual): unique identifier, display name, guild membership(s?) [NEEDS CLARIFICATION: multi-guild allowed?], current group, current instance (nullable), connection status.
+- **Player**: Represents an individual user participating in gameplay. Attributes (conceptual): unique identifier, display name, initiative priority rank, guild membership(s?) [NEEDS CLARIFICATION: multi-guild allowed?], current group, current instance (nullable), connection status.
 - **Group (Party)**: Temporary aggregation of players intending to enter an instance together. Attributes: group ID, member list, leader designation, formation timestamp.
 - **Guild**: Persistent social organization. Attributes: guild ID, name (unique), member roster, roles/ranks [NEEDS CLARIFICATION: role model], creation date.
 - **Instance (Battle Session)**: Isolated tile playfield and session scope. Attributes: instance ID, rule set version, current tile map state, participants (≤32), NPC entities, start time, end condition, status (active/completed/terminated), capacity limit (=32), open slots.
