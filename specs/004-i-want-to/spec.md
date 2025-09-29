@@ -60,13 +60,13 @@ As a player, I want to log into the tile game backend, join or create a group or
 ### Acceptance Scenarios
 1. **Given** a registered/logged-in player and no existing active battle, **When** the player requests to start an instanced battle (solo mode), **Then** the system creates an isolated battle instance with an initialized tile map and assigns the player to it.
 2. **Given** multiple players in a pre-formed group, **When** the group leader initiates an instanced battle, **Then** all group members are placed into the same new battle instance with a synchronized initial tile state.
-3. **Given** a player inside an active battle instance, **When** they place a tile per game rules, **Then** the updated tile state becomes visible to all other participants in that instance within an acceptable latency threshold [NEEDS CLARIFICATION: maximum acceptable update latency in ms].
+3. **Given** a player inside an active battle instance, **When** they place a tile per game rules, **Then** the updated tile state becomes visible to all other participants in that instance within ≤150ms end-to-end (client action to applied state) at the 95th percentile.
 4. **Given** a battle instance containing AI/NPC entities, **When** scripted environmental events trigger (e.g., NPC move, environmental hazard), **Then** the instance state updates and all players receive consistent event notifications.
 5. **Given** a player belongs to a guild, **When** they send a guild chat message, **Then** only members of that guild connected to the service receive the message in order sent.
 6. **Given** two players with mutual communication permissions, **When** one sends a private message, **Then** only the target player receives it and delivery success or failure is known to the sender.
 7. **Given** a player disconnects temporarily during an instanced battle, **When** they reconnect within a defined timeout window [NEEDS CLARIFICATION: reconnection grace period], **Then** they resume the same instance state (tile layout, position, pending effects) without data loss.
 8. **Given** a battle instance reaches its end condition (e.g., objective met), **When** the end condition is detected, **Then** final results (scores, outcomes, rewards) are produced and persisted for later retrieval.
-9. **Given** system load of up to ~1,000 concurrent connected players across multiple active instances, **When** standard gameplay actions occur (tile placement, chat messages), **Then** the system maintains performance within defined service level targets (to be specified: latency, throughput, error rate) without degradation beyond those thresholds.
+9. **Given** system load of up to ~1,000 concurrent connected players across multiple active instances, **When** standard gameplay actions occur (tile placement, chat messages), **Then** the system maintains performance meeting latency targets (tile placement ≤150ms p95, chat delivery ≤150ms p95) and does not exceed yet-to-be-defined throughput and error rate thresholds.
 
 ### Edge Cases
 - Single-player scenario: player starts solo instance and immediately ends (ensure lifecycle still recorded).
@@ -90,7 +90,7 @@ As a player, I want to log into the tile game backend, join or create a group or
 - **FR-006**: System MUST validate tile placement actions against game rules (placement legality, resource costs, timing constraints) and reject invalid actions with a reason code [NEEDS CLARIFICATION: catalog of rejection codes].
 - **FR-007**: System MUST support AI / NPC / scripted environmental events that can modify the instance state and be observable to all participants.
 - **FR-008**: System MUST provide real-time social communication channels: group chat (temporary party), guild chat (persistent membership), and private direct messages between two players with permission.
-- **FR-009**: System MUST preserve ordering of messages per channel scope (group, guild, private) as perceived by recipients within defined latency bounds [NEEDS CLARIFICATION: ordering guarantees across shards/instances].
+- **FR-009**: System MUST preserve ordering of messages per channel scope (group, guild, private) as perceived by recipients and deliver each chat message to all intended recipients within ≤150ms end-to-end at the 95th percentile; ordering behavior across shards/instances remains to be clarified [NEEDS CLARIFICATION: cross-shard ordering model].
 - **FR-010**: System MUST allow creation and management of guild entities (join, leave, membership list retrieval) [NEEDS CLARIFICATION: guild size limits and governance rules].
 - **FR-011**: System MUST track and persist battle outcomes (win/loss/objective metrics, rewards) accessible to relevant players after instance completion.
 - **FR-012**: System MUST handle player temporary disconnection with a grace period allowing seamless rejoin retaining prior state.
@@ -114,6 +114,7 @@ As a player, I want to log into the tile game backend, join or create a group or
 
 ### Session 2025-09-29
 - Q: What peak concurrent connected player scale should the backend handle in the initial release? → A: ~1,000 concurrent players (Option B)
+- Q: What end-to-end latency targets for tile placement propagation and chat delivery? → A: Tile ≤150ms p95, Chat ≤150ms p95 (Option A)
 
 ### Key Entities *(include if feature involves data)*
 - **Player**: Represents an individual user participating in gameplay. Attributes (conceptual): unique identifier, display name, guild membership(s?) [NEEDS CLARIFICATION: multi-guild allowed?], current group, current instance (nullable), connection status.
