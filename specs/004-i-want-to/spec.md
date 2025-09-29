@@ -75,7 +75,7 @@ As a player, I want to log into the tile game backend, join or create a group or
 - NPC scripted event collides with a player move in the same tick [NEEDS CLARIFICATION: server-side sequencing priority].
 - Chat spam or rate limit exceed events [NEEDS CLARIFICATION: message rate limits].
 - Player removed from guild while in battle using guild chat (message visibility after removal) [NEEDS CLARIFICATION: immediate revocation behavior].
-- Instance capacity reached when new player tries to join [NEEDS CLARIFICATION: max players per instance].
+- Instance capacity reached when new player tries to join (reject join once 32 active player slots filled).
 - Sudden server failure mid-instance (persistence / recovery expectations) [NEEDS CLARIFICATION: durability guarantees].
 - Cross-instance message attempt (should not be delivered; verify isolation).
 
@@ -94,7 +94,7 @@ As a player, I want to log into the tile game backend, join or create a group or
 - **FR-010**: System MUST allow creation and management of guild entities (join, leave, membership list retrieval) [NEEDS CLARIFICATION: guild size limits and governance rules].
 - **FR-011**: System MUST track and persist battle outcomes (win/loss/objective metrics, rewards) accessible to relevant players after instance completion.
 - **FR-012**: System MUST handle player temporary disconnection with a grace period allowing seamless rejoin retaining prior state.
-- **FR-013**: System MUST enforce instance capacity limits and reject further join attempts beyond configured maximum [NEEDS CLARIFICATION: capacity number].
+- **FR-013**: System MUST enforce a hard cap of 32 concurrent players per instance for the initial release and reject additional join attempts with a standardized capacity-exceeded error.
 - **FR-014**: System MUST prevent players from performing in-instance actions if they are no longer active participants (e.g., removed, disconnected past grace period, instance ended).
 - **FR-015**: System MUST provide a mechanism to end an instance when victory/defeat or other termination condition is reached and transition all participants to a post-instance state.
 - **FR-016**: System MUST protect privacy of private messages so that only intended recipients can access their content [NEEDS CLARIFICATION: retention & audit policies].
@@ -115,12 +115,13 @@ As a player, I want to log into the tile game backend, join or create a group or
 ### Session 2025-09-29
 - Q: What peak concurrent connected player scale should the backend handle in the initial release? → A: ~1,000 concurrent players (Option B)
 - Q: What end-to-end latency targets for tile placement propagation and chat delivery? → A: Tile ≤150ms p95, Chat ≤150ms p95 (Option A)
+- Q: What is the maximum number of players allowed in a single battle instance? → A: 32 players (Option D)
 
 ### Key Entities *(include if feature involves data)*
 - **Player**: Represents an individual user participating in gameplay. Attributes (conceptual): unique identifier, display name, guild membership(s?) [NEEDS CLARIFICATION: multi-guild allowed?], current group, current instance (nullable), connection status.
 - **Group (Party)**: Temporary aggregation of players intending to enter an instance together. Attributes: group ID, member list, leader designation, formation timestamp.
 - **Guild**: Persistent social organization. Attributes: guild ID, name (unique), member roster, roles/ranks [NEEDS CLARIFICATION: role model], creation date.
-- **Instance (Battle Session)**: Isolated tile playfield and session scope. Attributes: instance ID, rule set version, current tile map state, participants, NPC entities, start time, end condition, status (active/completed/terminated), capacity limit.
+- **Instance (Battle Session)**: Isolated tile playfield and session scope. Attributes: instance ID, rule set version, current tile map state, participants (≤32), NPC entities, start time, end condition, status (active/completed/terminated), capacity limit (=32), open slots.
 - **Tile Map / Board**: Structured grid or spatial layout where placements occur. Attributes: dimensions, rule constraints, per-cell state, version/timestamp.
 - **Tile Placement Action**: Proposed change to board state. Attributes: acting player, target coordinates, tile type, request timestamp, resolution status, rejection code (if any).
 - **NPC / AI Entity**: Non-player controlled actor. Attributes: entity ID, type/archetype, position/state, behavior script reference.
