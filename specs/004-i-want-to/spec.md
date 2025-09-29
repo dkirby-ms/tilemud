@@ -64,7 +64,7 @@ As a player, I want to log into the tile game backend, join or create a group or
 4. **Given** a battle instance containing AI/NPC entities, **When** scripted environmental events trigger (e.g., NPC move, environmental hazard), **Then** the instance state updates and all players receive consistent event notifications.
 5. **Given** a player belongs to a guild, **When** they send a guild chat message, **Then** only members of that guild connected to the service receive the message in order sent.
 6. **Given** two players with mutual communication permissions, **When** one sends a private message, **Then** only the target player receives it and delivery success or failure is known to the sender.
-7. **Given** a player disconnects temporarily during an instanced battle, **When** they reconnect within a defined timeout window [NEEDS CLARIFICATION: reconnection grace period], **Then** they resume the same instance state (tile layout, position, pending effects) without data loss.
+7. **Given** a player disconnects temporarily during an instanced battle, **When** they reconnect within 60 seconds (grace period), **Then** they resume the same instance state (tile layout, position, pending effects) without data loss; after 60 seconds the slot may be reclaimed and state discarded or summarized for outcomes.
 8. **Given** a battle instance reaches its end condition (e.g., objective met), **When** the end condition is detected, **Then** final results (scores, outcomes, rewards) are produced and persisted for later retrieval.
 9. **Given** system load of up to ~1,000 concurrent connected players across multiple active instances, **When** standard gameplay actions occur (tile placement, chat messages), **Then** the system maintains performance meeting latency targets (tile placement ≤150ms p95, chat delivery ≤150ms p95) and does not exceed yet-to-be-defined throughput and error rate thresholds.
 
@@ -93,7 +93,7 @@ As a player, I want to log into the tile game backend, join or create a group or
 - **FR-009**: System MUST preserve ordering of messages per channel scope (group, guild, private) as perceived by recipients and deliver each chat message to all intended recipients within ≤150ms end-to-end at the 95th percentile; ordering behavior across shards/instances remains to be clarified [NEEDS CLARIFICATION: cross-shard ordering model].
 - **FR-010**: System MUST allow creation and management of guild entities (join, leave, membership list retrieval) [NEEDS CLARIFICATION: guild size limits and governance rules].
 - **FR-011**: System MUST track and persist battle outcomes (win/loss/objective metrics, rewards) accessible to relevant players after instance completion.
-- **FR-012**: System MUST handle player temporary disconnection with a grace period allowing seamless rejoin retaining prior state.
+- **FR-012**: System MUST handle player temporary disconnection with a 60-second grace period allowing seamless rejoin retaining prior state; attempts to rejoin after 60 seconds MUST be rejected with a standardized grace-expired error and the player treated as removed for outcome processing.
 - **FR-013**: System MUST enforce a hard cap of 32 concurrent players per instance for the initial release and reject additional join attempts with a standardized capacity-exceeded error.
 - **FR-014**: System MUST prevent players from performing in-instance actions if they are no longer active participants (e.g., removed, disconnected past grace period, instance ended).
 - **FR-015**: System MUST provide a mechanism to end an instance when victory/defeat or other termination condition is reached and transition all participants to a post-instance state.
@@ -117,6 +117,7 @@ As a player, I want to log into the tile game backend, join or create a group or
 - Q: What end-to-end latency targets for tile placement propagation and chat delivery? → A: Tile ≤150ms p95, Chat ≤150ms p95 (Option A)
 - Q: What is the maximum number of players allowed in a single battle instance? → A: 32 players (Option D)
 - Q: When simultaneous tile placements target the same cell how is precedence resolved? → A: Player initiative priority order (Option B)
+- Q: What reconnection grace period is allowed for a disconnected player to rejoin the same instance? → A: 60 seconds (Option B)
 
 ### Key Entities *(include if feature involves data)*
 - **Player**: Represents an individual user participating in gameplay. Attributes (conceptual): unique identifier, display name, initiative priority rank, guild membership(s?) [NEEDS CLARIFICATION: multi-guild allowed?], current group, current instance (nullable), connection status.
