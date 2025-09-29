@@ -1,0 +1,17 @@
+# TileMUD Infrastructure Image Digests
+# This file pins container images to specific SHA256 digests for security and reproducibility
+# 
+# Format: image:tag@sha256:digest
+# 
+# Auto-updated by scripts/update-digests.sh
+# Last updated: 2025-09-29 00:49:08 UTC
+#
+# To verify current images match these digests:
+# ./infrastructure/scripts/infra-verify.sh
+
+
+# POSTGRES 18.0-alpine
+postgres:18.0-alpine@sha256:9636ae7feacd8d630303eede7f95cd0f472d514e7864422c6aa8ea07b2171df8
+
+# REDIS 8.2-alpine
+redis:8.2-alpine@sha256:987c376c727652f99625c7d205a1cba3cb2c53b92b0b62aade2bd48ee1593232

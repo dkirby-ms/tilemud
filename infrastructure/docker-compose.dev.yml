@@ -1,0 +1,49 @@
+networks:
+  tilemud_net:
+    name: ${TILEMUD_INFRA_NETWORK:-tilemud_net}
+    driver: bridge
+
+volumes:
+  tilemud_pg_data:
+    name: ${TILEMUD_PG_VOLUME:-tilemud_pg_data}
+
+services:
+  postgres:
+    image: ${TILEMUD_PG_IMAGE:-postgres:18.0-alpine}
+    container_name: tilemud_postgres
+    networks:
+      - tilemud_net
+    ports:
+      - "${TILEMUD_PG_PORT:-5438}:5432"
+    environment:
+      POSTGRES_USER: ${TILEMUD_PG_USER:-tilemud}
+      POSTGRES_PASSWORD: ${TILEMUD_PG_PASSWORD:-tilemud_dev_pw}
+      POSTGRES_DB: ${TILEMUD_PG_DB:-tilemud}
+      # Improve startup performance for local dev
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - tilemud_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TILEMUD_PG_USER:-tilemud} -d ${TILEMUD_PG_DB:-tilemud}"]
+      interval: 2s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: ${TILEMUD_REDIS_IMAGE:-redis:8.2-alpine}
+    container_name: tilemud_redis
+    networks:
+      - tilemud_net
+    ports:
+      - "${TILEMUD_REDIS_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    # Redis configuration for development (no persistence, no auth)
+    command: redis-server --save "" --appendonly no --maxmemory 128mb --maxmemory-policy allkeys-lru
