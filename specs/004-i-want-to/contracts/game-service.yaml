@@ -1,0 +1,192 @@
+openapi: 3.1.0
+info:
+  title: TileMUD Game Backend API
+  version: 0.1.0
+  description: >-
+    Minimal HTTP API surface for the TileMUD backend. Real-time gameplay occurs
+    over Colyseus WebSocket rooms; this REST surface covers health, outcomes,
+    and (initially) private message retrieval.
+servers:
+  - url: http://localhost:4000
+paths:
+  /health:
+    get:
+      summary: Health probe
+      operationId: getHealth
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+  /outcomes/{id}:
+    get:
+      summary: Get battle outcome by id
+      operationId: getBattleOutcome
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Outcome found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BattleOutcome'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /players/{playerId}/outcomes:
+    get:
+      summary: List recent battle outcomes for player
+      operationId: listPlayerOutcomes
+      parameters:
+        - in: path
+          name: playerId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: List of outcomes
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BattleOutcome'
+  /players/{playerId}/messages:
+    get:
+      summary: Retrieve private messages for player (inbound or outbound)
+      operationId: listPlayerMessages
+      parameters:
+        - in: path
+          name: playerId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: direction
+          schema:
+            type: string
+            enum: [inbound, outbound, both]
+            default: both
+        - in: query
+          name: since
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PrivateMessage'
+  /errors/catalog:
+    get:
+      summary: Error code seed catalog
+      operationId: listErrorCodes
+      responses:
+        '200':
+          description: Catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ErrorCode'
+components:
+  schemas:
+    BattleOutcome:
+      type: object
+      required: [id, instanceId, rulesetVersion, startedAt, endedAt, participants, outcome]
+      properties:
+        id: { type: string, format: uuid }
+        instanceId: { type: string, format: uuid }
+        rulesetVersion: { type: string }
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: string, format: date-time }
+        durationMs: { type: integer, minimum: 0 }
+        participants:
+          type: array
+          items:
+            type: object
+            required: [playerId, initiative, stats]
+            properties:
+              playerId: { type: string, format: uuid }
+              initiative: { type: integer }
+              stats: { type: object, additionalProperties: true }
+        outcome:
+          type: object
+          additionalProperties: true
+    PrivateMessage:
+      type: object
+      required: [id, senderId, recipientId, content, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        senderId: { type: string, format: uuid }
+        recipientId: { type: string, format: uuid }
+        content: { type: string, minLength: 1, maxLength: 2000 }
+        createdAt: { type: string, format: date-time }
+    ErrorCode:
+      type: object
+      required: [numericCode, reason, category, retryable, humanMessage]
+      properties:
+        numericCode: { type: string, pattern: '^E[0-9]{4}$' }
+        reason: { type: string }
+        category: { type: string, enum: [validation, conflict, capacity, rate_limit, state, security, internal] }
+        retryable: { type: boolean }
+        humanMessage: { type: string }
+    Error:
+      type: object
+      required: [numericCode, reason, category, retryable, humanMessage]
+      properties:
+        numericCode: { type: string }
+        reason: { type: string }
+        category: { type: string }
+        retryable: { type: boolean }
+        humanMessage: { type: string }
