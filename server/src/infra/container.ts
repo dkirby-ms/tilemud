@@ -1,6 +1,15 @@
 import { AppConfig, getConfig } from "./config.js";
 import { initializePostgres, closePostgres, PostgresClient, getPostgresClient } from "./postgres.js";
 import { initializeRedis, closeRedis, getRedisClient } from "./redis.js";
+import { RateLimiterService, RedisSlidingWindowStore } from "../services/rateLimiter.js";
+import { SnapshotService } from "../services/snapshotService.js";
+import { ErrorCatalogService } from "../services/errorCatalog.js";
+import { createPrivateMessageRepository, PrivateMessageRepository } from "../models/privateMessageRepository.js";
+import { MessageService } from "../services/messageService.js";
+import { createBattleOutcomeRepository, BattleOutcomeRepository } from "../models/battleOutcomeRepository.js";
+import { OutcomeService } from "../services/outcomeService.js";
+import { ReconnectService } from "../services/reconnectService.js";
+import { ActionPipeline } from "../services/actionPipeline.js";
 import type { Pool } from "pg";
 import type { RedisClientType } from "redis";
 
@@ -10,6 +19,15 @@ export interface Container {
   redis: RedisClientType;
   getPostgresClient: () => Promise<PostgresClient>;
   getRedisClient: () => RedisClientType;
+  rateLimiter: RateLimiterService;
+  snapshotService: SnapshotService;
+  errorCatalog: ErrorCatalogService;
+  privateMessageRepository: PrivateMessageRepository;
+  messageService: MessageService;
+  battleOutcomeRepository: BattleOutcomeRepository;
+  outcomeService: OutcomeService;
+  reconnectService: ReconnectService;
+  actionPipeline: ActionPipeline;
 }
 
 let container: Container | null = null;
@@ -24,6 +42,21 @@ export async function initializeContainer(): Promise<Container> {
   // Initialize infrastructure
   const postgres = await initializePostgres();
   const redis = await initializeRedis();
+  const rateLimiter = new RateLimiterService({ store: new RedisSlidingWindowStore(redis) });
+  const snapshotService = new SnapshotService();
+  const errorCatalog = new ErrorCatalogService();
+  const privateMessageRepository = createPrivateMessageRepository(postgres);
+  const messageService = new MessageService({
+    repository: privateMessageRepository,
+    rateLimiter
+  });
+  const battleOutcomeRepository = createBattleOutcomeRepository(postgres);
+  const outcomeService = new OutcomeService({ repository: battleOutcomeRepository });
+  const reconnectService = new ReconnectService({
+    redis,
+    defaultGracePeriodMs: 60_000
+  });
+  const actionPipeline = new ActionPipeline({ rateLimiter });
 
   container = {
     config,
@@ -31,6 +64,15 @@ export async function initializeContainer(): Promise<Container> {
     redis,
     getPostgresClient,
     getRedisClient,
+    rateLimiter,
+    snapshotService,
+    errorCatalog,
+    privateMessageRepository,
+    messageService,
+    battleOutcomeRepository,
+    outcomeService,
+    reconnectService,
+    actionPipeline,
   };
 
   return container;

@@ -1,128 +1,37 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+  BattleSnapshot,
+  BoardSnapshot,
+  SnapshotService
+} from "../../src/services/snapshotService.js";
+import { createBattleRoomState, PlayerSessionState } from "../../src/state/battleRoomState.js";
 
-// Snapshot data structures
-interface PlayerSnapshot {
-  id: string;
-  status: "active" | "disconnected";
-  initiative: number;
-  lastActionTick: number;
-}
+describe("Snapshot Service", () => {
+  let service: SnapshotService;
 
-interface BoardSnapshot {
-  width: number;
-  height: number;
-  cells: Array<{ tileType: number | null; lastUpdatedTick: number }>;
-}
-
-interface BattleSnapshot {
-  instanceId: string;
-  tick: number;
-  players: Record<string, PlayerSnapshot>;
-  board: BoardSnapshot;
-  timestamp: number;
-}
-
-// Snapshot serializer utilities
-class SnapshotSerializer {
-  static serialize(snapshot: BattleSnapshot): string {
-    return JSON.stringify(snapshot);
-  }
-
-  static deserialize(data: string): BattleSnapshot {
-    const parsed = JSON.parse(data);
-    
-    // Validate required fields
-    if (!parsed.instanceId || typeof parsed.tick !== "number") {
-      throw new Error("Invalid snapshot format: missing instanceId or tick");
-    }
-    
-    if (!parsed.players || typeof parsed.players !== "object") {
-      throw new Error("Invalid snapshot format: missing or invalid players");
-    }
-    
-    if (!parsed.board || !Array.isArray(parsed.board.cells)) {
-      throw new Error("Invalid snapshot format: missing or invalid board");
-    }
-    
-    return parsed as BattleSnapshot;
-  }
-
-  static extractPlayerView(snapshot: BattleSnapshot, playerId: string): Partial<BattleSnapshot> {
-    // Return only the data that a specific player should see
-    const playerData = snapshot.players[playerId];
-    if (!playerData) {
-      throw new Error(`Player ${playerId} not found in snapshot`);
-    }
-
-    return {
-      instanceId: snapshot.instanceId,
-      tick: snapshot.tick,
-      players: {
-        [playerId]: playerData,
-        // Include other active players but hide sensitive data
-        ...Object.fromEntries(
-          Object.entries(snapshot.players)
-            .filter(([id, player]) => id !== playerId && player.status === "active")
-            .map(([id, player]) => [
-              id, 
-              { 
-                id: player.id, 
-                status: player.status, 
-                initiative: player.initiative,
-                lastActionTick: 0 // Hide specific action timing from other players
-              }
-            ])
-        )
-      },
-      board: snapshot.board,
-      timestamp: snapshot.timestamp
-    };
-  }
-
-  static calculateSnapshotSize(snapshot: BattleSnapshot): number {
-    return new TextEncoder().encode(this.serialize(snapshot)).length;
-  }
-
-  static compressBoardDelta(oldBoard: BoardSnapshot, newBoard: BoardSnapshot): Array<{ index: number; tileType: number | null; tick: number }> {
-    const changes: Array<{ index: number; tileType: number | null; tick: number }> = [];
-    
-    if (oldBoard.cells.length !== newBoard.cells.length) {
-      throw new Error("Board size mismatch in delta calculation");
-    }
-    
-    for (let i = 0; i < newBoard.cells.length; i++) {
-      const oldCell = oldBoard.cells[i];
-      const newCell = newBoard.cells[i];
-      
-      if (oldCell.tileType !== newCell.tileType || oldCell.lastUpdatedTick !== newCell.lastUpdatedTick) {
-        changes.push({
-          index: i,
-          tileType: newCell.tileType,
-          tick: newCell.lastUpdatedTick
-        });
-      }
-    }
-    
-    return changes;
-  }
-}
-
-describe("Snapshot Serializer", () => {
   const sampleSnapshot: BattleSnapshot = {
     instanceId: "battle-123",
+    rulesetVersion: "ruleset-1.0.0",
+    status: "active",
     tick: 42,
+    startedAt: 1640995100000,
+    timestamp: 1640995200000,
     players: {
       "player-1": {
         id: "player-1",
+        displayName: "Player One",
         status: "active",
         initiative: 10,
-        lastActionTick: 40
+        lastActionTick: 40,
+        reconnectGraceEndsAt: null
       },
       "player-2": {
         id: "player-2",
+        displayName: "Player Two",
         status: "disconnected",
         initiative: 7,
-        lastActionTick: 35
+        lastActionTick: 35,
+        reconnectGraceEndsAt: null
       }
     },
     board: {
@@ -140,46 +49,45 @@ describe("Snapshot Serializer", () => {
         { tileType: 3, lastUpdatedTick: 41 }
       ]
     },
-    timestamp: 1640995200000
+    npcs: {},
+    pendingActions: []
   };
 
+  beforeEach(() => {
+    service = new SnapshotService();
+  });
+
   it("serializes and deserializes snapshots correctly", () => {
-    const serialized = SnapshotSerializer.serialize(sampleSnapshot);
+    const serialized = service.serialize(sampleSnapshot);
     expect(typeof serialized).toBe("string");
-    
-    const deserialized = SnapshotSerializer.deserialize(serialized);
+
+    const deserialized = service.deserialize(serialized);
     expect(deserialized).toEqual(sampleSnapshot);
   });
 
   it("validates snapshot format during deserialization", () => {
     expect(() => {
-      SnapshotSerializer.deserialize("{}");
+      service.deserialize("{}");
     }).toThrow("Invalid snapshot format: missing instanceId or tick");
 
     expect(() => {
-      SnapshotSerializer.deserialize('{"instanceId": "test", "tick": 1}');
+      service.deserialize('{"instanceId": "test", "tick": 1}');
     }).toThrow("Invalid snapshot format: missing or invalid players");
 
     expect(() => {
-      SnapshotSerializer.deserialize('{"instanceId": "test", "tick": 1, "players": {}}');
+      service.deserialize('{"instanceId": "test", "tick": 1, "players": {}}');
     }).toThrow("Invalid snapshot format: missing or invalid board");
   });
 
   it("extracts player-specific view correctly", () => {
-    const playerView = SnapshotSerializer.extractPlayerView(sampleSnapshot, "player-1");
-    
+    const playerView = service.extractPlayerView(sampleSnapshot, "player-1");
+
     expect(playerView.instanceId).toBe("battle-123");
     expect(playerView.tick).toBe(42);
     expect(playerView.board).toEqual(sampleSnapshot.board);
-    
-    // Should include the requesting player's full data
-    expect(playerView.players!["player-1"]).toEqual(sampleSnapshot.players["player-1"]);
-    
-    // Should not include disconnected players
-    expect(playerView.players!["player-2"]).toBeUndefined();
-    
-    // If there were other active players, their lastActionTick should be hidden
-    // (tested with a modified sample below)
+
+    expect(playerView.players["player-1"]).toEqual(sampleSnapshot.players["player-1"]);
+    expect(playerView.players["player-2"]).toBeUndefined();
   });
 
   it("hides sensitive data from other players in view", () => {
@@ -190,30 +98,27 @@ describe("Snapshot Serializer", () => {
         "player-2": { ...sampleSnapshot.players["player-2"], status: "active" }
       }
     };
-    
-    const playerView = SnapshotSerializer.extractPlayerView(multiPlayerSnapshot, "player-1");
-    
-    // Should include other active players but hide their action timing
-    expect(playerView.players!["player-2"].lastActionTick).toBe(0);
-    expect(playerView.players!["player-2"].initiative).toBe(7); // But keep initiative visible
+
+    const playerView = service.extractPlayerView(multiPlayerSnapshot, "player-1");
+
+    expect(playerView.players["player-2"].lastActionTick).toBe(0);
+    expect(playerView.players["player-2"].initiative).toBe(7);
   });
 
   it("throws error when extracting view for non-existent player", () => {
     expect(() => {
-      SnapshotSerializer.extractPlayerView(sampleSnapshot, "non-existent");
+      service.extractPlayerView(sampleSnapshot, "non-existent");
     }).toThrow("Player non-existent not found in snapshot");
   });
 
   it("calculates snapshot size in bytes", () => {
-    const size = SnapshotSerializer.calculateSnapshotSize(sampleSnapshot);
+    const size = service.calculateSnapshotSize(sampleSnapshot);
     expect(size).toBeGreaterThan(0);
     expect(typeof size).toBe("number");
-    
-    // Should be reasonable size (not too large)
-    expect(size).toBeLessThan(10000); // Less than 10KB for this sample
+    expect(size).toBeLessThan(10_000);
   });
 
-  it("compresses board delta efficiently", () => {
+  it("computes board delta efficiently", () => {
     const oldBoard: BoardSnapshot = {
       width: 3,
       height: 3,
@@ -233,23 +138,19 @@ describe("Snapshot Serializer", () => {
     const newBoard: BoardSnapshot = {
       ...oldBoard,
       cells: [
-        ...oldBoard.cells.slice(0, 8), // Keep first 8 cells unchanged
-        { tileType: 3, lastUpdatedTick: 41 } // Only change the last cell
+        ...oldBoard.cells.slice(0, 8),
+        { tileType: 3, lastUpdatedTick: 41 }
       ]
     };
 
-    const changes = SnapshotSerializer.compressBoardDelta(oldBoard, newBoard);
-    
+    const changes = SnapshotService.computeBoardDelta(oldBoard, newBoard);
+
     expect(changes).toHaveLength(1);
-    expect(changes[0]).toEqual({
-      index: 8,
-      tileType: 3,
-      tick: 41
-    });
+    expect(changes[0]).toEqual({ index: 8, tileType: 3, tick: 41 });
   });
 
   it("handles empty delta when boards are identical", () => {
-    const changes = SnapshotSerializer.compressBoardDelta(sampleSnapshot.board, sampleSnapshot.board);
+    const changes = SnapshotService.computeBoardDelta(sampleSnapshot.board, sampleSnapshot.board);
     expect(changes).toHaveLength(0);
   });
 
@@ -266,7 +167,36 @@ describe("Snapshot Serializer", () => {
     };
 
     expect(() => {
-      SnapshotSerializer.compressBoardDelta(sampleSnapshot.board, smallerBoard);
+      SnapshotService.computeBoardDelta(sampleSnapshot.board, smallerBoard);
     }).toThrow("Board size mismatch in delta calculation");
+  });
+
+  it("creates snapshots from battle room state", () => {
+    const state = createBattleRoomState({
+      instanceId: "instance-1",
+      rulesetVersion: "ruleset-1.2.3",
+      board: { width: 2, height: 2 },
+      startedAt: 1_640_995_100_000,
+      initialTick: 5
+    });
+
+    const player = new PlayerSessionState();
+    player.playerId = "player-99";
+    player.displayName = "Player 99";
+    player.status = "active";
+    player.initiative = 12;
+    player.lastActionTick = 4;
+    player.reconnectDeadline = 1_640_995_160_000;
+    state.players.set(player.playerId, player);
+
+    state.board.applyTilePlacement({ x: 1, y: 0 }, 3, 6, player.playerId);
+
+    const snapshot = service.createSnapshot(state);
+
+    expect(snapshot.instanceId).toBe("instance-1");
+    expect(snapshot.rulesetVersion).toBe("ruleset-1.2.3");
+    expect(snapshot.tick).toBe(5);
+    expect(snapshot.players["player-99"].reconnectGraceEndsAt).toBe(1_640_995_160_000);
+    expect(snapshot.board.cells[1]).toEqual({ tileType: 3, lastUpdatedTick: 6 });
   });
 });

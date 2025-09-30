@@ -1,4 +1,4 @@
-import { Pool, PoolClient, PoolConfig } from "pg";
+import { Pool, PoolClient } from "pg";
 import { getConfig } from "./config.js";
 
 let pool: Pool | null = null;
@@ -15,7 +15,7 @@ export async function initializePostgres(): Promise<Pool> {
 
   const config = getConfig();
   
-  const poolConfig: PoolConfig = {
+  const poolConfig: ConstructorParameters<typeof Pool>[0] = {
     connectionString: config.databaseUrl,
     max: 10,
     idleTimeoutMillis: 30000,

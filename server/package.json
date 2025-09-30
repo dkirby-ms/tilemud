@@ -13,6 +13,7 @@
     "lint": "eslint \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\""
   },
   "dependencies": {
+  "@colyseus/schema": "3.0.61",
     "colyseus": "0.16.4",
     "express": "5.0.0",
     "pino": "8.19.0",

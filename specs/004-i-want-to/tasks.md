@@ -83,17 +83,17 @@
 - [x] T028 [P] Publish error code registry `server/src/models/errorCodes.ts` aligned with contract catalog (Depends on: T001)
 - [x] T029 [P] Define Redis rate limit counter helper `server/src/models/rateLimitCounter.ts` (Depends on: T003)
 - [x] T030 [P] Define reconnect session helper `server/src/models/reconnectSession.ts` (Depends on: T003)
-- [ ] T031 [P] Define action request discriminated union `server/src/actions/actionRequest.ts` (Depends on: T023)
-- [ ] T032 [P] Model battle room state schema (BattleInstance) `server/src/state/battleRoomState.ts` using Colyseus types (Depends on: T031)
+- [x] T031 [P] Define action request discriminated union `server/src/actions/actionRequest.ts` (Depends on: T023)
+- [x] T032 [P] Model battle room state schema (BattleInstance) `server/src/state/battleRoomState.ts` using Colyseus types (Depends on: T031)
 
 ### Services & Infrastructure
-- [ ] T033 Implement rate limiter service `server/src/services/rateLimiter.ts` (Depends on: T029)
-- [ ] T034 Implement snapshot service `server/src/services/snapshotService.ts` (Depends on: T032)
-- [ ] T035 Implement error catalog service `server/src/services/errorCatalog.ts` (Depends on: T028)
-- [ ] T036 Implement message service `server/src/services/messageService.ts` (Depends on: T027, T033)
-- [ ] T037 Implement outcome service `server/src/services/outcomeService.ts` (Depends on: T026)
-- [ ] T038 Implement reconnect service `server/src/services/reconnectService.ts` (Depends on: T030)
-- [ ] T039 Implement action pipeline coordinator `server/src/services/actionPipeline.ts` (Depends on: T031, T033)
+- [x] T033 Implement rate limiter service `server/src/services/rateLimiter.ts` (Depends on: T029)
+- [x] T034 Implement snapshot service `server/src/services/snapshotService.ts` (Depends on: T032)
+- [x] T035 Implement error catalog service `server/src/services/errorCatalog.ts` (Depends on: T028)
+- [x] T036 Implement message service `server/src/services/messageService.ts` (Depends on: T027, T033)
+- [x] T037 Implement outcome service `server/src/services/outcomeService.ts` (Depends on: T026)
+- [x] T038 Implement reconnect service `server/src/services/reconnectService.ts` (Depends on: T030)
+- [x] T039 Implement action pipeline coordinator `server/src/services/actionPipeline.ts` (Depends on: T031, T033)
 - [ ] T040 Implement ruleset service `server/src/services/rulesetService.ts` (Depends on: T025)
 
 ### Actions & Rooms
