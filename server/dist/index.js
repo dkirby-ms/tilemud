@@ -1,8 +1,10 @@
 import { createServer as createHttpServer } from "node:http";
 import { Server as ColyseusServer } from "colyseus";
 import { createApp } from "./api/app.js";
+import { getAppLogger } from "./logging/logger.js";
 import { initializeContainer, shutdownContainer } from "./infra/container.js";
 import { registerRooms } from "./rooms/registerRooms.js";
+import { runMigrations } from "./scripts/run-migrations.js";
 let activeServer = null;
 export async function start() {
     if (activeServer) {
@@ -10,8 +12,18 @@ export async function start() {
     }
     const container = await initializeContainer();
     const config = container.config;
-    const logger = console;
-    const app = createApp();
+    const logger = getAppLogger();
+    // Run database migrations (idempotent). Fail fast if migrations cannot be applied.
+    try {
+        await runMigrations({ logger });
+        logger.info?.("migrations.applied");
+    }
+    catch (error) {
+        logger.error?.("migrations.failed", error);
+        await shutdownContainer().catch(() => undefined);
+        throw error;
+    }
+    const app = createApp(container);
     const httpServer = createHttpServer(app);
     const gameServer = new ColyseusServer({ server: httpServer });
     const battleRoomDependencies = {
@@ -21,7 +33,7 @@ export async function start() {
         reconnectService: container.reconnectService,
         messageService: container.messageService,
         ruleSetService: container.ruleSetService,
-        logger,
+        logger: logger.child?.({ scope: "BattleRoom" }) ?? logger,
         now: () => Date.now(),
         defaultGracePeriodMs: 60_000
     };
@@ -93,8 +105,8 @@ const isDirectExecution = (() => {
 })();
 if (isDirectExecution) {
     start().catch((error) => {
-        // eslint-disable-next-line no-console -- placeholder logging until pino integration (T055)
-        console.error("Failed to start server", error);
+        const logger = getAppLogger();
+        logger.error?.("server.start_failed", error);
         if (maybeProcess) {
             maybeProcess.exitCode = 1;
         }

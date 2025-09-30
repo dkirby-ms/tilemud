@@ -1,14 +1,33 @@
 import express from "express";
-export function createApp() {
+import { getContainer } from "../infra/container.js";
+import { getAppLogger } from "../logging/logger.js";
+import { createHealthRouter } from "./health.js";
+import { createOutcomesRouter } from "./outcomes.js";
+import { createPlayerMessagesRouter } from "./playerMessages.js";
+import { createErrorCatalogRouter } from "./errorCatalog.js";
+import { createErrorMiddleware } from "./errorMiddleware.js";
+export function createApp(existingContainer) {
     const app = express();
+    const container = existingContainer ?? getContainer();
+    const logger = getAppLogger();
     app.use(express.json());
+    // Routers
+    app.use(createHealthRouter(logger));
+    app.use(createOutcomesRouter({ outcomeService: container.outcomeService, logger }));
+    app.use(createPlayerMessagesRouter({ messageService: container.messageService, logger }));
+    app.use(createErrorCatalogRouter({ errorCatalog: container.errorCatalog, logger }));
+    // 404 handler (after known routes, before error middleware)
     app.use((req, res) => {
-        res.status(501).json({
-            error: "Not implemented",
-            method: req.method,
-            path: req.path
+        res.status(404).json({
+            numericCode: "E1004", // INSTANCE_TERMINATED used as generic missing resource placeholder
+            reason: "instance_terminated",
+            category: "state",
+            retryable: false,
+            humanMessage: "Resource not found"
         });
     });
+    // Error middleware
+    app.use(createErrorMiddleware(logger));
     return app;
 }
 //# sourceMappingURL=app.js.map

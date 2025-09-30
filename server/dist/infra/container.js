@@ -12,15 +12,19 @@ import { OutcomeService } from "../services/outcomeService.js";
 import { ReconnectService } from "../services/reconnectService.js";
 import { ActionPipeline } from "../services/actionPipeline.js";
 import { RuleSetService } from "../services/rulesetService.js";
+import { getAppLogger } from "@@/logging/logger.js";
 let container = null;
 export async function initializeContainer() {
     if (container) {
         return container;
     }
     const config = getConfig();
+    const logger = getAppLogger();
     // Initialize infrastructure
     const postgres = await initializePostgres();
+    logger.info?.("infra.postgres.initialized");
     const redis = await initializeRedis();
+    logger.info?.("infra.redis.initialized");
     const rateLimiter = new RateLimiterService({ store: new RedisSlidingWindowStore(redis) });
     const snapshotService = new SnapshotService();
     const errorCatalog = new ErrorCatalogService();
@@ -55,6 +59,7 @@ export async function initializeContainer() {
         outcomeService,
         reconnectService,
         actionPipeline,
+        logger,
     };
     return container;
 }
@@ -66,10 +71,13 @@ export function getContainer() {
 }
 export async function shutdownContainer() {
     if (container) {
+        const logger = container.logger ?? console;
+        logger.info?.("infra.shutdown.begin");
         await Promise.all([
-            closePostgres(),
-            closeRedis(),
+            closePostgres().catch((e) => logger.error?.("infra.postgres.close_failed", e)),
+            closeRedis().catch((e) => logger.error?.("infra.redis.close_failed", e)),
         ]);
+        logger.info?.("infra.shutdown.complete");
         container = null;
     }
 }
