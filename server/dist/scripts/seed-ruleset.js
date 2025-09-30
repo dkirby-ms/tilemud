@@ -1,38 +1,63 @@
 import { fileURLToPath } from "node:url";
 import { initializeContainer, shutdownContainer } from "../infra/container.js";
-/** Example baseline rule set. In a real system this could load from JSON or external source. */
-const BASE_RULESET = {
-    version: "v1",
-    metadata: {
-        maxPlayers: 4,
-        board: {
-            width: 16,
-            height: 16,
-            initialTiles: []
-        }
+const DEFAULT_RULESET_VERSION = "1.0.0";
+const DEFAULT_RULESET_METADATA = {
+    description: "Baseline arena with symmetric spawn tiles and neutral control points.",
+    tags: ["baseline", "solo", "pvp"],
+    maxPlayers: 16,
+    board: {
+        width: 16,
+        height: 16,
+        initialTiles: [
+            { x: 7, y: 7, tileType: 1 },
+            { x: 8, y: 8, tileType: 1 },
+            { x: 7, y: 8, tileType: 2 },
+            { x: 8, y: 7, tileType: 2 },
+            { x: 0, y: 0, tileType: 9 },
+            { x: 15, y: 15, tileType: 9 }
+        ]
     },
-    rules: {
-        placement: {
-            allowOverlap: false
-        }
+    placement: {
+        adjacency: "orthogonal",
+        allowFirstPlacementAnywhere: true
+    },
+    extras: {
+        ruleSetName: "baseline-arena",
+        placementInitiative: "player",
+        npcScriptVersion: "1.0.0"
     }
 };
-export async function seedRuleset(logger = console) {
+export async function seedRuleset(options = {}) {
     const container = await initializeContainer();
+    const logger = options.logger ?? container.logger ?? console;
+    const version = options.version ?? DEFAULT_RULESET_VERSION;
+    const metadata = options.metadata ?? DEFAULT_RULESET_METADATA;
+    const allowIfExists = options.allowIfExists ?? true;
     try {
-        const existing = await container.ruleSetRepository.findByVersion(BASE_RULESET.version);
+        const existing = await container.ruleSetService.getRuleSetByVersion(version);
         if (existing) {
-            logger.info?.("seed.ruleset.exists", { version: BASE_RULESET.version });
+            const message = allowIfExists
+                ? "seed.ruleset.exists"
+                : "seed.ruleset.exists.error";
+            logger.info?.(message, { version });
+            if (!allowIfExists) {
+                throw new Error(`Rule set version ${version} already exists.`);
+            }
             return;
         }
-        await container.ruleSetRepository.create({
-            version: BASE_RULESET.version,
-            metadataJson: {
-                ...BASE_RULESET.metadata,
-                rules: BASE_RULESET.rules
-            }
+        const created = await container.ruleSetService.publishRuleSet({
+            version,
+            metadata
         });
-        logger.info?.("seed.ruleset.created", { version: BASE_RULESET.version });
+        logger.info?.("seed.ruleset.created", {
+            version: created.version,
+            ruleSetId: created.id,
+            initialTileCount: created.metadata.board.initialTiles.length
+        });
+    }
+    catch (error) {
+        logger.error?.("seed.ruleset.failed", { version, error });
+        throw error;
     }
     finally {
         await shutdownContainer();

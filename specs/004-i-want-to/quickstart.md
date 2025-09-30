@@ -29,7 +29,8 @@ We compile first so runtime scripts exist in `dist/`.
 ```bash
 npm run build
 npm run migrate          # applies SQL files in infrastructure/migrations (idempotent)
-npm run seed:ruleset     # inserts baseline ruleset version v1 (idempotent)
+npm run seed:ruleset     # inserts baseline ruleset version 1.0.0 (idempotent)
+# pass "-- --version X.Y.Z --metadata path/to/file" to publish an alternate ruleset
 ```
 
 ## 4. Start Dev Backend

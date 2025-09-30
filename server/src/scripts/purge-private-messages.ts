@@ -1,20 +1,52 @@
 import { fileURLToPath } from "node:url";
 import { initializeContainer, shutdownContainer } from "../infra/container.js";
 import type { AppLogger } from "../logging/logger.js";
+import { createMessagePurgeHelper } from "../models/privateMessageRepository.js";
 
 export interface PurgeOptions {
-  retentionDays?: number; // default 30
+  retentionDays?: number;
   logger?: AppLogger;
+  /** Purge only the conversations that involve this player as origin. */
+  playerId?: string;
+  /** Optional list of counterpart player IDs to purge alongside playerId. */
+  targetPlayerIds?: string[];
 }
 
-export async function purgePrivateMessages(options: PurgeOptions = {}): Promise<number> {
-  const retention = Math.max(1, Math.floor(options.retentionDays ?? 30));
-  const logger = options.logger ?? console;
+export interface PurgeResult {
+  purgedCount: number;
+  errors: string[];
+}
+
+export async function purgePrivateMessages(options: PurgeOptions = {}): Promise<PurgeResult> {
   const container = await initializeContainer();
+  const logger = options.logger ?? container.logger ?? console;
+  const retention = Math.max(1, Math.floor(options.retentionDays ?? 30));
+
   try {
-    const deleted = await container.privateMessageRepository.purgeOldMessages(retention);
-    logger.info?.("purge.private_messages", { retentionDays: retention, deleted });
-    return deleted;
+    const helper = createMessagePurgeHelper(container.privateMessageRepository);
+    let result: PurgeResult;
+
+    if (options.playerId && options.targetPlayerIds && options.targetPlayerIds.length) {
+      result = await helper.purgeUserConversations(options.playerId, options.targetPlayerIds);
+      logger.info?.("purge.private_messages.conversations", {
+        playerId: options.playerId,
+        targetCount: options.targetPlayerIds.length,
+        purged: result.purgedCount,
+        errors: result.errors
+      });
+    } else {
+      result = await helper.runScheduledPurge(retention);
+      logger.info?.("purge.private_messages.retention", {
+        retentionDays: retention,
+        purged: result.purgedCount,
+        errors: result.errors
+      });
+    }
+
+    return result;
+  } catch (error) {
+    logger.error?.("purge.private_messages.failed", { error });
+    throw error;
   } finally {
     await shutdownContainer();
   }

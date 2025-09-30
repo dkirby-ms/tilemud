@@ -98,13 +98,14 @@ export class BattleRoom extends Room {
             return;
         }
         if (consented) {
-            this.dependencies.reconnectService.removeSession?.(playerId, this.state.instanceId);
+            // Intentional fire-and-forget; no need to await cleanup when user voluntarily leaves
+            void this.dependencies.reconnectService.removeSession?.(playerId, this.state.instanceId);
             this.state.players.delete(playerId);
             return;
         }
         player.status = "disconnected";
         const gracePeriodMs = this.dependencies.defaultGracePeriodMs;
-        const now = this.dependencies.now();
+        const _now = this.dependencies.now(); // eslint-disable-line @typescript-eslint/no-unused-vars -- retained for future timeout logic
         const session = await this.dependencies.reconnectService.createSession({
             playerId,
             instanceId: this.state.instanceId,

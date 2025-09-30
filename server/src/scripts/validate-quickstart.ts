@@ -58,7 +58,7 @@ async function main(): Promise<void> {
   const result: ValidationResult = { healthOk: false, seedOk: false, joinOk: false };
   // Seed rule set (idempotent)
   try {
-    await seedRuleset(console as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+  await seedRuleset({ logger: console as any }); // eslint-disable-line @typescript-eslint/no-explicit-any
     result.seedOk = true;
   } catch (e) {
     console.error("seed.failed", e);

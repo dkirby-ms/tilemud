@@ -80,6 +80,17 @@ Enable pretty output: `LOG_PRETTY=true`.
 | Latency harness (WIP) | `npm run latency:harness` (after T066) |
 | Quickstart validator (WIP) | `npm run validate:quickstart` (after T067) |
 
+**CLI tips**
+
+- Override version or metadata when seeding:
+	```bash
+	npm run seed:ruleset -- --version 1.1.0 --metadata ./rulesets/arena.json
+	```
+- Purge a specific conversation (player `p1` vs `p2,p3`) keeping global retention untouched:
+	```bash
+	npm run purge:messages -- --player-id p1 --targets p2,p3
+	```
+
 ## Testing Strategy
 - Contract tests assert HTTP surface matches OpenAPI spec and config constraints.
 - Unit tests isolate services with in‑memory / mock Redis & repositories.

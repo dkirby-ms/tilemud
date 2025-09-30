@@ -93,10 +93,9 @@ export const ERROR_CODES = Object.freeze(ERROR_DEFINITIONS.reduce((acc, definiti
     acc[definition.key] = parseNumericCode(definition.numericCode);
     return acc;
 }, {}));
-const ERROR_MESSAGES = Object.freeze(ERROR_DEFINITIONS.reduce((acc, definition) => {
-    acc[definition.key] = definition.humanMessage;
-    return acc;
-}, {}));
+// NOTE: A map of messages by code key existed here (ERROR_MESSAGES) but was unused.
+// If future localization or external exposure requires bulk export of messages,
+// reintroduce a similar structure. Removed to satisfy lint (no-unused-vars).
 const DEFINITIONS_BY_NUMERIC = new Map();
 const DEFINITIONS_BY_REASON = new Map();
 for (const definition of ERROR_DEFINITIONS) {

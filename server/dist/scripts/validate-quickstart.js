@@ -50,7 +50,7 @@ async function main() {
     const result = { healthOk: false, seedOk: false, joinOk: false };
     // Seed rule set (idempotent)
     try {
-        await seedRuleset(console); // eslint-disable-line @typescript-eslint/no-explicit-any
+        await seedRuleset({ logger: console }); // eslint-disable-line @typescript-eslint/no-explicit-any
         result.seedOk = true;
     }
     catch (e) {
