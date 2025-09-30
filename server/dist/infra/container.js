@@ -5,10 +5,13 @@ import { RateLimiterService, RedisSlidingWindowStore } from "../services/rateLim
 import { SnapshotService } from "../services/snapshotService.js";
 import { ErrorCatalogService } from "../services/errorCatalog.js";
 import { createPrivateMessageRepository } from "../models/privateMessageRepository.js";
+import { createRuleSetRepository } from "../models/rulesetRepository.js";
 import { MessageService } from "../services/messageService.js";
 import { createBattleOutcomeRepository } from "../models/battleOutcomeRepository.js";
 import { OutcomeService } from "../services/outcomeService.js";
 import { ReconnectService } from "../services/reconnectService.js";
+import { ActionPipeline } from "../services/actionPipeline.js";
+import { RuleSetService } from "../services/rulesetService.js";
 let container = null;
 export async function initializeContainer() {
     if (container) {
@@ -22,16 +25,19 @@ export async function initializeContainer() {
     const snapshotService = new SnapshotService();
     const errorCatalog = new ErrorCatalogService();
     const privateMessageRepository = createPrivateMessageRepository(postgres);
+    const ruleSetRepository = createRuleSetRepository(postgres);
     const messageService = new MessageService({
         repository: privateMessageRepository,
         rateLimiter
     });
     const battleOutcomeRepository = createBattleOutcomeRepository(postgres);
     const outcomeService = new OutcomeService({ repository: battleOutcomeRepository });
+    const ruleSetService = new RuleSetService({ repository: ruleSetRepository });
     const reconnectService = new ReconnectService({
         redis,
         defaultGracePeriodMs: 60_000
     });
+    const actionPipeline = new ActionPipeline({ rateLimiter });
     container = {
         config,
         postgres,
@@ -43,9 +49,12 @@ export async function initializeContainer() {
         errorCatalog,
         privateMessageRepository,
         messageService,
+        ruleSetRepository,
+        ruleSetService,
         battleOutcomeRepository,
         outcomeService,
         reconnectService,
+        actionPipeline,
     };
     return container;
 }

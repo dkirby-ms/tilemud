@@ -1,9 +1,5 @@
-import {
-  type ActionRequest,
-  getActionPriorityDescriptor,
-  type ActionPriorityDescriptor,
-  isTilePlacementAction
-} from "@@/actions/actionRequest.js";
+import { type ActionRequest, getActionPriorityDescriptor, isTilePlacementAction } from "@@/actions/actionRequest.js";
+import { compareActionRequests } from "@@/actions/ordering.js";
 import type { RateLimitDecision, RateLimiterService } from "./rateLimiter.js";
 
 export type EnqueueRejectionReason = "duplicate" | "queue_full";
@@ -22,37 +18,10 @@ export interface PipelineEnqueueResult {
 
 export interface QueuedAction {
   action: ActionRequest;
-  priority: ActionPriorityDescriptor;
+  priority: ReturnType<typeof getActionPriorityDescriptor>;
 }
 
 const DEFAULT_MAX_QUEUE_SIZE = 512;
-
-function comparePriority(a: ActionPriorityDescriptor, b: ActionPriorityDescriptor): number {
-  if (a.priorityTier !== b.priorityTier) {
-    return a.priorityTier - b.priorityTier;
-  }
-  if (a.categoryRank !== b.categoryRank) {
-    return a.categoryRank - b.categoryRank;
-  }
-  if (a.initiativeRank !== b.initiativeRank) {
-    return a.initiativeRank - b.initiativeRank;
-  }
-  if (a.timestamp !== b.timestamp) {
-    return a.timestamp - b.timestamp;
-  }
-  return 0;
-}
-
-function compareQueuedActions(a: QueuedAction, b: QueuedAction): number {
-  const priorityComparison = comparePriority(a.priority, b.priority);
-  if (priorityComparison !== 0) {
-    return priorityComparison;
-  }
-  if (a.action.timestamp !== b.action.timestamp) {
-    return a.action.timestamp - b.action.timestamp;
-  }
-  return a.action.id.localeCompare(b.action.id);
-}
 
 export class ActionPipeline {
   private readonly rateLimiter: RateLimiterService;
@@ -106,13 +75,13 @@ export class ActionPipeline {
   }
 
   peek(limit?: number): QueuedAction[] {
-    const entries = this.queue.map((action) => ({
+    const ordered = [...this.queue].sort(compareActionRequests);
+    const take =
+      typeof limit === "number" ? Math.min(Math.max(0, Math.floor(limit)), ordered.length) : ordered.length;
+    return ordered.slice(0, take).map((action) => ({
       action,
       priority: getActionPriorityDescriptor(action)
     }));
-    entries.sort(compareQueuedActions);
-    const take = typeof limit === "number" ? Math.min(Math.max(0, Math.floor(limit)), entries.length) : entries.length;
-    return entries.slice(0, take);
   }
 
   drainBatch(limit?: number): QueuedAction[] {
@@ -120,15 +89,17 @@ export class ActionPipeline {
       return [];
     }
 
-    const entries = this.peek();
-    const take = typeof limit === "number" ? Math.min(Math.max(0, Math.floor(limit)), entries.length) : entries.length;
-    const batch = entries.slice(0, take);
-    const remaining = entries.slice(take).map((entry) => entry.action);
-
-    this.queue = remaining;
+    const ordered = [...this.queue].sort(compareActionRequests);
+    const take =
+      typeof limit === "number" ? Math.min(Math.max(0, Math.floor(limit)), ordered.length) : ordered.length;
+    const selected = ordered.slice(0, take);
+    this.queue = ordered.slice(take);
     this.rebuildIndexes();
 
-    return batch;
+    return selected.map((action) => ({
+      action,
+      priority: getActionPriorityDescriptor(action)
+    }));
   }
 
   removeWhere(predicate: (action: ActionRequest) => boolean): number {

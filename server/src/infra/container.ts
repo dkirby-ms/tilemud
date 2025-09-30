@@ -5,11 +5,13 @@ import { RateLimiterService, RedisSlidingWindowStore } from "../services/rateLim
 import { SnapshotService } from "../services/snapshotService.js";
 import { ErrorCatalogService } from "../services/errorCatalog.js";
 import { createPrivateMessageRepository, PrivateMessageRepository } from "../models/privateMessageRepository.js";
+import { createRuleSetRepository, RuleSetRepository } from "../models/rulesetRepository.js";
 import { MessageService } from "../services/messageService.js";
 import { createBattleOutcomeRepository, BattleOutcomeRepository } from "../models/battleOutcomeRepository.js";
 import { OutcomeService } from "../services/outcomeService.js";
 import { ReconnectService } from "../services/reconnectService.js";
 import { ActionPipeline } from "../services/actionPipeline.js";
+import { RuleSetService } from "../services/rulesetService.js";
 import type { Pool } from "pg";
 import type { RedisClientType } from "redis";
 
@@ -24,6 +26,8 @@ export interface Container {
   errorCatalog: ErrorCatalogService;
   privateMessageRepository: PrivateMessageRepository;
   messageService: MessageService;
+  ruleSetRepository: RuleSetRepository;
+  ruleSetService: RuleSetService;
   battleOutcomeRepository: BattleOutcomeRepository;
   outcomeService: OutcomeService;
   reconnectService: ReconnectService;
@@ -46,12 +50,14 @@ export async function initializeContainer(): Promise<Container> {
   const snapshotService = new SnapshotService();
   const errorCatalog = new ErrorCatalogService();
   const privateMessageRepository = createPrivateMessageRepository(postgres);
+  const ruleSetRepository = createRuleSetRepository(postgres);
   const messageService = new MessageService({
     repository: privateMessageRepository,
     rateLimiter
   });
   const battleOutcomeRepository = createBattleOutcomeRepository(postgres);
   const outcomeService = new OutcomeService({ repository: battleOutcomeRepository });
+  const ruleSetService = new RuleSetService({ repository: ruleSetRepository });
   const reconnectService = new ReconnectService({
     redis,
     defaultGracePeriodMs: 60_000
@@ -69,6 +75,8 @@ export async function initializeContainer(): Promise<Container> {
     errorCatalog,
     privateMessageRepository,
     messageService,
+    ruleSetRepository,
+    ruleSetService,
     battleOutcomeRepository,
     outcomeService,
     reconnectService,

@@ -1,137 +1,222 @@
 import { describe, expect, it } from "vitest";
+import {
+  compareActionRequests,
+  comparePriorityDescriptors
+} from "../../src/actions/ordering.js";
+import {
+  getActionPriorityDescriptor,
+  type ActionPriorityDescriptor,
+  type ActionRequest,
+  type NpcEventActionRequest,
+  type ScriptedEventActionRequest,
+  type TilePlacementActionRequest
+} from "../../src/actions/actionRequest.js";
 
-interface PendingAction {
-  id: string;
-  type: "tile_placement" | "npc_event" | "scripted_event";
-  priorityTier?: number; // npc/scripted only
-  playerInitiative?: number; // tile placement only
-  timestamp: number; // enqueue time
-  payload: unknown;
+const INSTANCE_ID = "instance-1";
+
+function baseRequest(id: string, timestamp: number) {
+  return {
+    id,
+    instanceId: INSTANCE_ID,
+    timestamp,
+    requestedTick: timestamp,
+    metadata: undefined
+  };
 }
 
-// Ordering comparator (per tick batch):
-// 1. priorityTier ascending (undefined -> +infinity)
-// 2. type precedence: npc/scripted before tile_placement
-// 3. playerInitiative descending
-// 4. timestamp ascending
-// 5. id lexicographic as final tie-breaker
-function compareActions(a: PendingAction, b: PendingAction): number {
-  // 1. Priority tier (undefined treated as +infinity)
-  const aPriority = a.priorityTier ?? Number.POSITIVE_INFINITY;
-  const bPriority = b.priorityTier ?? Number.POSITIVE_INFINITY;
-  if (aPriority !== bPriority) {
-    return aPriority - bPriority;
+function createTilePlacement(
+  options: {
+    id: string;
+    timestamp: number;
+    initiative: number;
+    position?: { x: number; y: number };
   }
-
-  // 2. Type precedence: npc/scripted before tile_placement
-  const typeOrder = { npc_event: 0, scripted_event: 0, tile_placement: 1 };
-  const aTypeOrder = typeOrder[a.type];
-  const bTypeOrder = typeOrder[b.type];
-  if (aTypeOrder !== bTypeOrder) {
-    return aTypeOrder - bTypeOrder;
-  }
-
-  // 3. Player initiative descending (for tile_placement only)
-  if (a.type === "tile_placement" && b.type === "tile_placement") {
-    const aInitiative = a.playerInitiative ?? 0;
-    const bInitiative = b.playerInitiative ?? 0;
-    if (aInitiative !== bInitiative) {
-      return bInitiative - aInitiative; // descending
+): TilePlacementActionRequest {
+  const { id, timestamp, initiative, position = { x: 0, y: 0 } } = options;
+  return {
+    ...baseRequest(id, timestamp),
+    type: "tile_placement",
+    playerId: `${id}-player`,
+    playerInitiative: initiative,
+    lastActionTick: 0,
+    payload: {
+      position,
+      tileType: 1
     }
-  }
-
-  // 4. Timestamp ascending
-  if (a.timestamp !== b.timestamp) {
-    return a.timestamp - b.timestamp;
-  }
-
-  // 5. ID lexicographic
-  return a.id.localeCompare(b.id);
+  };
 }
 
-describe("Action Ordering Comparator", () => {
-  it("orders by priority tier ascending (undefined treated as infinity)", () => {
-    const actions: PendingAction[] = [
-      { id: "c", type: "scripted_event", priorityTier: 3, timestamp: 100, payload: {} },
-      { id: "a", type: "npc_event", priorityTier: 1, timestamp: 100, payload: {} },
-      { id: "d", type: "tile_placement", timestamp: 100, payload: {} }, // no priorityTier
-      { id: "b", type: "scripted_event", priorityTier: 2, timestamp: 100, payload: {} }
-    ];
+function createNpcEvent(
+  options: { id: string; timestamp: number; priorityTier: number }
+): NpcEventActionRequest {
+  const { id, timestamp, priorityTier } = options;
+  return {
+    ...baseRequest(id, timestamp),
+    type: "npc_event",
+    npcId: `${id}-npc`,
+    priorityTier,
+    payload: {
+      eventType: "move"
+    }
+  };
+}
 
-    const sorted = actions.sort(compareActions);
+function createScriptedEvent(
+  options: { id: string; timestamp: number; priorityTier: number }
+): ScriptedEventActionRequest {
+  const { id, timestamp, priorityTier } = options;
+  return {
+    ...baseRequest(id, timestamp),
+    type: "scripted_event",
+    scriptId: `${id}-script`,
+    priorityTier,
+    payload: {
+      triggerId: `${id}-trigger`,
+      eventType: "hazard"
+    }
+  };
+}
 
-    expect(sorted.map(a => a.id)).toEqual(["a", "b", "c", "d"]);
+function descriptor(overrides: Partial<ActionPriorityDescriptor>): ActionPriorityDescriptor {
+  return {
+    priorityTier: Number.POSITIVE_INFINITY,
+    categoryRank: 0,
+    initiativeRank: 0,
+    timestamp: 0,
+    ...overrides
+  };
+}
+
+describe("comparePriorityDescriptors", () => {
+  it("orders by priority tier ascending", () => {
+    const ordered = [
+      descriptor({ priorityTier: 1 }),
+      descriptor({ priorityTier: 2 }),
+      descriptor({ priorityTier: 10 })
+    ].sort(comparePriorityDescriptors);
+
+    expect(ordered.map((entry) => entry.priorityTier)).toEqual([1, 2, 10]);
   });
 
-  it("orders npc/scripted events before tile placements at same priority tier", () => {
-    const actions: PendingAction[] = [
-      { id: "tile", type: "tile_placement", timestamp: 100, payload: {} },
-      { id: "npc", type: "npc_event", priorityTier: undefined, timestamp: 100, payload: {} },
-      { id: "script", type: "scripted_event", priorityTier: undefined, timestamp: 100, payload: {} }
-    ];
+  it("orders by category rank when priority matches", () => {
+    const ordered = [
+      descriptor({ categoryRank: 5 }),
+      descriptor({ categoryRank: 2 }),
+      descriptor({ categoryRank: 7 })
+    ].sort(comparePriorityDescriptors);
 
-    const sorted = actions.sort(compareActions);
-
-    // npc and scripted should come before tile (they all have same priority tier = infinity)
-    expect(sorted[0].id).toEqual("npc");
-    expect(sorted[1].id).toEqual("script");
-    expect(sorted[2].id).toEqual("tile");
+    expect(ordered.map((entry) => entry.categoryRank)).toEqual([2, 5, 7]);
   });
 
-  it("orders tile placements by player initiative descending", () => {
-    const actions: PendingAction[] = [
-      { id: "low", type: "tile_placement", playerInitiative: 5, timestamp: 100, payload: {} },
-      { id: "high", type: "tile_placement", playerInitiative: 10, timestamp: 100, payload: {} },
-      { id: "mid", type: "tile_placement", playerInitiative: 7, timestamp: 100, payload: {} }
-    ];
+  it("orders by initiative rank when priority and category match", () => {
+    const ordered = [
+      descriptor({ initiativeRank: -10 }),
+      descriptor({ initiativeRank: -1 }),
+      descriptor({ initiativeRank: -7 })
+    ].sort(comparePriorityDescriptors);
 
-    const sorted = actions.sort(compareActions);
-
-    expect(sorted.map(a => a.id)).toEqual(["high", "mid", "low"]);
+    expect(ordered.map((entry) => entry.initiativeRank)).toEqual([-10, -7, -1]);
   });
 
-  it("uses timestamp as tiebreaker for same initiative", () => {
-    const actions: PendingAction[] = [
-      { id: "later", type: "tile_placement", playerInitiative: 5, timestamp: 200, payload: {} },
-      { id: "earlier", type: "tile_placement", playerInitiative: 5, timestamp: 100, payload: {} }
+  it("orders by timestamp when other ranks match", () => {
+    const ordered = [
+      descriptor({ timestamp: 500 }),
+      descriptor({ timestamp: 100 }),
+      descriptor({ timestamp: 300 })
+    ].sort(comparePriorityDescriptors);
+
+    expect(ordered.map((entry) => entry.timestamp)).toEqual([100, 300, 500]);
+  });
+});
+
+describe("compareActionRequests", () => {
+  it("orders by priority tier ascending", () => {
+    const actions: ActionRequest[] = [
+      createScriptedEvent({ id: "script-3", priorityTier: 3, timestamp: 100 }),
+      createNpcEvent({ id: "npc-1", priorityTier: 1, timestamp: 100 }),
+      createScriptedEvent({ id: "script-2", priorityTier: 2, timestamp: 100 }),
+      createTilePlacement({ id: "tile", initiative: 5, timestamp: 100 })
     ];
 
-    const sorted = actions.sort(compareActions);
+    const sorted = [...actions].sort(compareActionRequests);
 
-    expect(sorted.map(a => a.id)).toEqual(["earlier", "later"]);
+    expect(sorted.map((action) => action.id)).toEqual(["npc-1", "script-2", "script-3", "tile"]);
   });
 
-  it("uses id lexicographic as final tiebreaker", () => {
-    const actions: PendingAction[] = [
-      { id: "zebra", type: "tile_placement", playerInitiative: 5, timestamp: 100, payload: {} },
-      { id: "alpha", type: "tile_placement", playerInitiative: 5, timestamp: 100, payload: {} },
-      { id: "beta", type: "tile_placement", playerInitiative: 5, timestamp: 100, payload: {} }
+  it("orders NPC and scripted events ahead of tile placements when priority ties", () => {
+    const equalPriority = Number.POSITIVE_INFINITY;
+    const actions: ActionRequest[] = [
+      createTilePlacement({ id: "tile", initiative: 5, timestamp: 100 }),
+      createNpcEvent({ id: "npc", priorityTier: equalPriority, timestamp: 100 }),
+      createScriptedEvent({ id: "script", priorityTier: equalPriority, timestamp: 100 })
     ];
 
-    const sorted = actions.sort(compareActions);
+    const sorted = [...actions].sort(compareActionRequests);
 
-    expect(sorted.map(a => a.id)).toEqual(["alpha", "beta", "zebra"]);
+    expect(sorted.map((action) => action.id)).toEqual(["npc", "script", "tile"]);
   });
 
-  it("handles complex mixed scenario deterministically", () => {
-    const actions: PendingAction[] = [
-      { id: "tile-high", type: "tile_placement", playerInitiative: 10, timestamp: 150, payload: {} },
-      { id: "npc-p2", type: "npc_event", priorityTier: 2, timestamp: 100, payload: {} },
-      { id: "script-p1", type: "scripted_event", priorityTier: 1, timestamp: 200, payload: {} },
-      { id: "tile-low", type: "tile_placement", playerInitiative: 3, timestamp: 120, payload: {} },
-      { id: "npc-p1", type: "npc_event", priorityTier: 1, timestamp: 180, payload: {} }
+  it("orders tile placements by initiative descending", () => {
+    const actions: ActionRequest[] = [
+      createTilePlacement({ id: "low", initiative: 5, timestamp: 100 }),
+      createTilePlacement({ id: "high", initiative: 10, timestamp: 100 }),
+      createTilePlacement({ id: "mid", initiative: 7, timestamp: 100 })
     ];
 
-    const sorted = actions.sort(compareActions);
+    const sorted = [...actions].sort(compareActionRequests);
 
-    // Expected order:
-    // 1. script-p1 (priority 1, earliest by tier)
-    // 2. npc-p1 (priority 1, but timestamp later than script-p1)
-    // 3. npc-p2 (priority 2)
-    // 4. tile-high (no priority tier = infinity, but higher initiative)
-    // 5. tile-low (no priority tier = infinity, lower initiative)
-    expect(sorted.map(a => a.id)).toEqual([
-      "script-p1", "npc-p1", "npc-p2", "tile-high", "tile-low"
+    expect(sorted.map((action) => action.id)).toEqual(["high", "mid", "low"]);
+  });
+
+  it("uses timestamp as a tie breaker", () => {
+    const actions: ActionRequest[] = [
+      createTilePlacement({ id: "later", initiative: 5, timestamp: 200 }),
+      createTilePlacement({ id: "earlier", initiative: 5, timestamp: 100 })
+    ];
+
+    const sorted = [...actions].sort(compareActionRequests);
+
+    expect(sorted.map((action) => action.id)).toEqual(["earlier", "later"]);
+  });
+
+  it("uses id as final tie breaker", () => {
+    const actions: ActionRequest[] = [
+      createTilePlacement({ id: "zebra", initiative: 5, timestamp: 100 }),
+      createTilePlacement({ id: "alpha", initiative: 5, timestamp: 100 }),
+      createTilePlacement({ id: "beta", initiative: 5, timestamp: 100 })
+    ];
+
+    const sorted = [...actions].sort(compareActionRequests);
+
+    expect(sorted.map((action) => action.id)).toEqual(["alpha", "beta", "zebra"]);
+  });
+
+  it("handles complex mixed scenarios deterministically", () => {
+    const actions: ActionRequest[] = [
+      createTilePlacement({ id: "tile-high", initiative: 10, timestamp: 150 }),
+      createNpcEvent({ id: "npc-p2", priorityTier: 2, timestamp: 100 }),
+      createScriptedEvent({ id: "script-p1", priorityTier: 1, timestamp: 200 }),
+      createTilePlacement({ id: "tile-low", initiative: 3, timestamp: 120 }),
+      createNpcEvent({ id: "npc-p1", priorityTier: 1, timestamp: 180 })
+    ];
+
+    const sorted = [...actions].sort(compareActionRequests);
+
+    expect(sorted.map((action) => action.id)).toEqual([
+      "npc-p1",
+      "script-p1",
+      "npc-p2",
+      "tile-high",
+      "tile-low"
     ]);
+  });
+
+  it("aligns with priority descriptors", () => {
+    const action = createTilePlacement({ id: "sample", initiative: 9, timestamp: 50 });
+    const descriptor = getActionPriorityDescriptor(action);
+
+    expect(descriptor.priorityTier).toBe(Number.POSITIVE_INFINITY);
+    expect(descriptor.categoryRank).toBeGreaterThan(0);
+    expect(descriptor.initiativeRank).toBe(-9);
   });
 });
