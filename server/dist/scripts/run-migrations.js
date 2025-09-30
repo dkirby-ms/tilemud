@@ -1,8 +1,8 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { getPostgresClient, initializePostgres } from "@@/infra/postgres.js";
-import { getConfig } from "@@/infra/config.js";
+import { getPostgresClient, initializePostgres } from "../infra/postgres.js";
+import { getConfig } from "../infra/config.js";
 const DEFAULT_DIR = path.resolve(fileURLToPath(import.meta.url), "../../../../infrastructure/migrations");
 export async function runMigrations(options = {}) {
     const logger = options.logger ?? console;

@@ -1,4 +1,4 @@
-import { TileMudError } from "@@/models/errorCodes.js";
+import { TileMudError } from "../models/errorCodes.js";
 function isReconnectSession(value) {
     if (!value || typeof value !== "object") {
         return false;

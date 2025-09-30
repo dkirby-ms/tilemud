@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { initializeContainer, shutdownContainer } from "@@/infra/container.js";
+import { initializeContainer, shutdownContainer } from "../infra/container.js";
 export async function purgePrivateMessages(options = {}) {
     const retention = Math.max(1, Math.floor(options.retentionDays ?? 30));
     const logger = options.logger ?? console;

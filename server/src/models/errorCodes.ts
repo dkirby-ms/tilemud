@@ -128,12 +128,9 @@ export const ERROR_CODES: Readonly<Record<ErrorCodeKey, number>> = Object.freeze
   }, {} as Record<ErrorCodeKey, number>)
 );
 
-const ERROR_MESSAGES: Readonly<Record<ErrorCodeKey, string>> = Object.freeze(
-  ERROR_DEFINITIONS.reduce<Record<ErrorCodeKey, string>>((acc, definition) => {
-    acc[definition.key] = definition.humanMessage;
-    return acc;
-  }, {} as Record<ErrorCodeKey, string>)
-);
+// NOTE: A map of messages by code key existed here (ERROR_MESSAGES) but was unused.
+// If future localization or external exposure requires bulk export of messages,
+// reintroduce a similar structure. Removed to satisfy lint (no-unused-vars).
 
 const DEFINITIONS_BY_NUMERIC = new Map<number, (typeof ERROR_DEFINITIONS)[number]>();
 const DEFINITIONS_BY_REASON = new Map<string, (typeof ERROR_DEFINITIONS)[number]>();

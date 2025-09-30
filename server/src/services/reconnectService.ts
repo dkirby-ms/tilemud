@@ -3,8 +3,8 @@ import {
   type PlayerReconnectState,
   type ReconnectSession,
   type ReconnectResult
-} from "@@/models/reconnectSession.js";
-import { TileMudError } from "@@/models/errorCodes.js";
+} from "../models/reconnectSession.js";
+import { TileMudError } from "../models/errorCodes.js";
 
 export interface ReconnectServiceDependencies {
   redis: RedisClientType;

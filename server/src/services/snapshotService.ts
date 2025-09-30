@@ -4,7 +4,7 @@ import type {
   BoardCellState,
   BoardState,
   PlayerConnectionStatus
-} from "@@/state/battleRoomState.js";
+} from "../state/battleRoomState.js";
 import type { MapSchema } from "@colyseus/schema";
 
 export interface SnapshotServiceOptions {

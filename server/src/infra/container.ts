@@ -14,7 +14,7 @@ import { ActionPipeline } from "../services/actionPipeline.js";
 import { RuleSetService } from "../services/rulesetService.js";
 import type { Pool } from "pg";
 import type { RedisClientType } from "redis";
-import { getAppLogger, type AppLogger } from "@@/logging/logger.js";
+import { getAppLogger, type AppLogger } from "../logging/logger.js";
 
 export interface Container {
   config: AppConfig;

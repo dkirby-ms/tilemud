@@ -1,6 +1,6 @@
 import { toTilePlacementActionLike, validateTilePlacementOrThrow, TilePlacementValidationError } from "./validation.js";
-import { NpcState } from "@@/state/battleRoomState.js";
-import { TileMudError } from "@@/models/errorCodes.js";
+import { NpcState } from "../state/battleRoomState.js";
+import { TileMudError } from "../models/errorCodes.js";
 const DEFAULT_PLACEMENT_RULES = Object.freeze({
     adjacency: "orthogonal",
     allowFirstPlacementAnywhere: true

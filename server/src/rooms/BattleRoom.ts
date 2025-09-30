@@ -1,26 +1,15 @@
 import { Room, type Client } from "colyseus";
-import {
-  type ActionRequest,
-  parseActionRequest,
-  isTilePlacementAction
-} from "@@/actions/actionRequest.js";
-import {
-  ActionHandlerService,
-  type ActionResolution
-} from "@@/actions/handlers.js";
-import { ActionPipeline } from "@@/services/actionPipeline.js";
-import type { RateLimiterService } from "@@/services/rateLimiter.js";
-import type { SnapshotService, PlayerViewSnapshot } from "@@/services/snapshotService.js";
-import type { OutcomeService } from "@@/services/outcomeService.js";
-import type { MessageService } from "@@/services/messageService.js";
-import type { RuleSetDetail, RuleSetService } from "@@/services/rulesetService.js";
-import {
-  BattleRoomState,
-  PlayerSessionState,
-  createBattleRoomState
-} from "@@/state/battleRoomState.js";
-import type { ReconnectSession } from "@@/models/reconnectSession.js";
-import { TileMudError } from "@@/models/errorCodes.js";
+import { type ActionRequest, parseActionRequest, isTilePlacementAction } from "../actions/actionRequest.js";
+import { ActionHandlerService, type ActionResolution } from "../actions/handlers.js";
+import { ActionPipeline } from "../services/actionPipeline.js";
+import type { RateLimiterService } from "../services/rateLimiter.js";
+import type { SnapshotService, PlayerViewSnapshot } from "../services/snapshotService.js";
+import type { OutcomeService } from "../services/outcomeService.js";
+import type { MessageService } from "../services/messageService.js";
+import type { RuleSetDetail, RuleSetService } from "../services/rulesetService.js";
+import { BattleRoomState, PlayerSessionState, createBattleRoomState } from "../state/battleRoomState.js";
+import type { ReconnectSession } from "../models/reconnectSession.js";
+import { TileMudError } from "../models/errorCodes.js";
 
 interface LoggerLike {
   info?: (...args: unknown[]) => void;
@@ -194,14 +183,15 @@ export class BattleRoom extends Room<BattleRoomState, BattleRoomMetadata> {
     }
 
     if (consented) {
-      this.dependencies.reconnectService.removeSession?.(playerId, this.state.instanceId);
+      // Intentional fire-and-forget; no need to await cleanup when user voluntarily leaves
+      void this.dependencies.reconnectService.removeSession?.(playerId, this.state.instanceId);
       this.state.players.delete(playerId);
       return;
     }
 
     player.status = "disconnected";
     const gracePeriodMs = this.dependencies.defaultGracePeriodMs;
-    const now = this.dependencies.now();
+  const _now = this.dependencies.now(); // eslint-disable-line @typescript-eslint/no-unused-vars -- retained for future timeout logic
 
     const session = await this.dependencies.reconnectService.createSession({
       playerId,

@@ -1,4 +1,4 @@
-import { ValidationError as TileMudValidationError } from "@@/models/errorCodes.js";
+import { ValidationError as TileMudValidationError } from "../models/errorCodes.js";
 const DEFAULT_PLACEMENT_RULES = Object.freeze({
     adjacency: "orthogonal",
     allowFirstPlacementAnywhere: true

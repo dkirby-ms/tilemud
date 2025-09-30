@@ -1,4 +1,5 @@
-import { Pool } from "pg";
+import pg from "pg";
+const { Pool } = pg;
 import { getConfig } from "./config.js";
 let pool = null;
 export async function initializePostgres() {

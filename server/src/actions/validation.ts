@@ -1,4 +1,4 @@
-import { ValidationError as TileMudValidationError } from "@@/models/errorCodes.js";
+import { ValidationError as TileMudValidationError } from "../models/errorCodes.js";
 import type { ActionRequest, TilePlacementActionRequest } from "./actionRequest.js";
 
 export interface TilePosition {

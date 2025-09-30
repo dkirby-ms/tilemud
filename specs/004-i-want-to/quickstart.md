@@ -1,67 +1,117 @@
-# Quickstart: Running & Testing the Game Backend (Planned Implementation)
+# Quickstart: Running & Testing the Game Backend
 
-This guide will be validated after implementation tasks are completed. It describes the intended developer workflow for the new backend service.
+Updated after automation (T067) & latency harness (T066). This reflects the **current implemented** backend workflow.
 
 ## 1. Prerequisites
-- Node.js 20 LTS
-- Docker (PostgreSQL + Redis via existing `infrastructure` scripts) running: `./infrastructure/scripts/infra-up.sh`
-- Yarn or npm (project will define package manager in future commit)
+| Requirement | Notes |
+| ----------- | ----- |
+| Node.js 20 LTS | ESM + TS strict build |
+| Docker | Required for local Postgres + Redis infra scripts |
+| Bash (GNU) | Infra & generation scripts |
 
-## 2. Install Dependencies (after backend folder added)
+Start infra (PostgreSQL 18 + Redis 8.2) from repo root:
+```bash
+./infrastructure/scripts/infra-up.sh
 ```
+On success a `.env.local.infra` file is generated. Source it (or export the variables) before running the server:
+```bash
+set -a; source ./.env.local.infra; set +a
+```
+
+## 2. Install Dependencies
+```bash
 cd server
 npm install
 ```
 
-## 3. Start Dev Backend (planned)
+## 3. Build, Migrate & Seed
+We compile first so runtime scripts exist in `dist/`.
+```bash
+npm run build
+npm run migrate          # applies SQL files in infrastructure/migrations (idempotent)
+npm run seed:ruleset     # inserts baseline ruleset version v1 (idempotent)
 ```
+
+## 4. Start Dev Backend
+```bash
 npm run dev
 ```
-Expected:
-- Express HTTP server on PORT (default 4000?)
-- Colyseus listens for WebSocket connections at `/colyseus`
-- Health endpoint: `GET /health` returns `{ status: "ok" }`
+Expected (logs):
+- `infra.postgres.initialized`, `infra.redis.initialized`
+- `migrations.applied`
+- `server.start { port: <PORT> }`
 
-## 4. Create / Join Battle Flow (Conceptual)
-1. Client sends `create_or_join` message to BattleLobby room (or REST POST) → returns `roomId`.
-2. Client connects to BattleRoom via Colyseus join.
-3. Server broadcasts initial board + participants.
-4. Client sends tile placement action messages: `{ op: "tile.place", x, y, tileType }`.
-5. Server resolves ordering, updates state, patch diff flows to all clients.
+HTTP / WS Surface:
+- Health: `GET /health` → `{ status: "ok", uptimeMs, ... }`
+- Outcomes: `GET /outcomes/:id`
+- Player outcomes: `GET /players/:playerId/outcomes`
+- Player messages: `GET /players/:playerId/messages`
+- Error catalog: `GET /errors/catalog`
 
-## 5. Private Messaging Flow
-1. Client issues `pm.send` message: `{ toPlayerId, content }`.
-2. Server validates rate limit + permission, persists message, forwards to recipient.
-3. Optional retrieval via REST: `GET /players/{playerId}/messages?since=...` (deferred until needed).
+Realtime Rooms (Colyseus):
+- `lobby` (matchmaking / create instance)
+- `battle` (active battle instances)
 
-## 6. Reconnection Flow
+## 5. Create / Join Battle Flow (Implemented Shape)
+1. Join `lobby` room (Colyseus) and send message `instance.create_or_join` with payload:
+  ```json
+  { "mode": "solo", "requestId": "r1" }
+  ```
+2. Receive `instance.ready` → contains `instanceId`, `roomId` (battle room id), `rulesetVersion`.
+3. Join the `battle` room with `{ playerId: "p123" }`.
+4. Receive initial `snapshot.update` (board + players).
+5. Submit tile placement via message `action.submit` payload (simplified):
+  ```json
+  {
+    "id": "a1",
+    "type": "tile_placement",
+    "instanceId": "<battle-instance-id>",
+    "playerId": "p123",
+    "playerInitiative": 10,
+    "timestamp": 0,
+    "payload": { "position": { "x": 1, "y": 2 }, "tileType": 3 }
+  }
+  ```
+6. Expect `action.applied` broadcast with tick & effects or `action.rejected`.
+
+## 6. Private Messaging Flow (HTTP Retrieval)
+1. (Realtime send TBD future slice.)
+2. Persisted messages query: `GET /players/:playerId/messages?direction=inbound|outbound&since=<ISO>&limit=50`.
+3. Rate limiting enforced; rejection returns standardized error payload.
+
+## 7. Reconnection Flow
 1. Client loses connection; within 60s attempts rejoin with same session token.
 2. Server validates grace window and returns fresh snapshot if accepted.
 3. After 60s server purges membership; late attempt receives `grace_period_expired` error.
 
-## 7. Running Tests (after implementation)
-```
+## 8. Running Tests
+```bash
 npm test
 ```
-- Contract tests: validate OpenAPI matches endpoints.
-- Integration tests: simulate multiple players joining a room and performing actions.
-- Unit tests: ordering algorithm, rate limit logic.
+Layers:
+- Contract: OpenAPI signature & endpoint behaviors.
+- Unit: services (rate limiter, reconnect, message, ordering, snapshot, validation).
+- Integration placeholders (scaffolded, some assertions may be TODO while slice evolves).
+- Performance probe: ordering comparator (ensures sort under threshold).
 
-## 8. Seed Data (Optional)
-Insert baseline ruleset version:
-```
-insert into rulesets (id, version, metadata_json) values (gen_random_uuid(), '1.0.0', '{}');
-```
+## 9. Seeding & Purge Utilities
+| Action | Command |
+| ------ | ------- |
+| Idempotent baseline ruleset (v1) | `npm run seed:ruleset` |
+| Purge aged private messages (30d default) | `npm run purge:messages` |
 
-## 9. Environment Variables (Planned)
+## 10. Environment Variables
+These are generated automatically by infra scripts (`.env.local.infra`). Minimal set:
 ```
-DATABASE_URL=postgres://user:pass@localhost:5438/tilemud
+DATABASE_URL=postgres://tilemud:tilemud@localhost:5438/tilemud
 REDIS_URL=redis://localhost:6380
 PORT=4000
 LOG_LEVEL=info
+LOG_PRETTY=true
 ```
+Load manually if not exporting automatically.
 
-## 10. Error Codes
+## 11. Error Codes
 Returned error payload shape:
 ```
 {
@@ -73,14 +123,34 @@ Returned error payload shape:
 }
 ```
 
-## 11. Future Enhancements (Beyond Slice)
+## 12. Tooling & Automation
+| Purpose | Script |
+| ------- | ------ |
+| OpenAPI types sync | `./server/scripts/generate-openapi-types.sh` |
+| Quickstart validator (starts server, seeds, joins) | `npm run validate:quickstart` |
+| Latency harness (multi-client snapshot RTT) | `npm run latency:harness` |
+
+Latency harness environment overrides:
+```
+HARNESS_CLIENTS=10 HARNESS_SNAPSHOT_ROUNDS=10 npm run latency:harness
+```
+
+Sample output snippet:
+```json
+{
+  "handshake": { "p95": 42.1, "average": 37.0, "count": 10 },
+  "snapshotRtt": { "p95": 15.3, "average": 11.2 }
+}
+```
+
+## 13. Future Enhancements (Beyond Slice)
 - Horizontal scaling with room distribution & Redis presence.
 - Metrics endpoint (Prometheus format).
 - Extended error code registry in DB.
 - NPC behavior scripting DSL.
 - Shared type package exported to web-client.
 
-## 12. Validation Checklist (to run post-implementation)
+## 14. Validation Checklist
 - Can create & join room; board state received.
 - Tile placement updates broadcast <=150ms p95 locally (rough measurement via test harness timestamps).
 - Precedence conflict behaves deterministically (write deterministic test scenario).
@@ -89,4 +159,4 @@ Returned error payload shape:
 - Reconnect <60s resumes; reconnect >60s rejected correctly.
 
 ---
-This quickstart will be updated if implementation details diverge during task execution.
+Generated & maintained by automation tasks (T064, T066–T068). Update when contract / flows change.

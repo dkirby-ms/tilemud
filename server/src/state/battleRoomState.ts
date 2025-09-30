@@ -1,5 +1,5 @@
 import { ArraySchema, MapSchema, Schema, defineTypes } from "@colyseus/schema";
-import type { ActionRequest } from "@@/actions/actionRequest.js";
+import type { ActionRequest } from "../actions/actionRequest.js";
 
 export type BattleRoomStatus = "active" | "ending" | "ended" | "terminated";
 export type PlayerConnectionStatus = "active" | "disconnected";

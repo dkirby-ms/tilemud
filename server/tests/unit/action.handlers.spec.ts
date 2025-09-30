@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type {
-  ActionRequest,
+  ActionRequest as _ActionRequest, // retained for potential future test additions
   NpcEventActionRequest,
   ScriptedEventActionRequest,
   TilePlacementActionRequest
@@ -186,12 +186,13 @@ describe("ActionHandlerService", () => {
 
     expectApplied(result);
     expect(result.effects).toHaveLength(1);
-    const effect = result.effects[0];
-    expect(effect.type).toBe("tile_placement");
-    expect(effect.position).toEqual({ x: 2, y: 3 });
-    expect(effect.tileType).toBe(3);
-    expect(effect.previousTileType).toBeNull();
-    expect(effect.playerId).toBe(player.playerId);
+  const effect = result.effects[0];
+  expect(effect.type).toBe("tile_placement");
+  const tileEffect = effect.type === "tile_placement" ? effect : undefined;
+  expect(tileEffect?.position).toEqual({ x: 2, y: 3 });
+  expect(tileEffect?.tileType).toBe(3);
+  expect(tileEffect?.previousTileType).toBeNull();
+  expect(tileEffect?.playerId).toBe(player.playerId);
 
     const cell = state.board.getCell({ x: 2, y: 3 });
     expect(cell?.tileType).toBe(3);
@@ -284,11 +285,12 @@ describe("ActionHandlerService", () => {
 
     expectApplied(result);
     expect(result.effects).toHaveLength(1);
-    const effect = result.effects[0];
-    expect(effect.type).toBe("npc_event");
-    expect(effect.npcId).toBe(action.npcId);
-    expect(effect.eventType).toBe(action.payload.eventType);
-    expect(effect.data).toEqual(action.payload.data);
+  const effect = result.effects[0];
+  expect(effect.type).toBe("npc_event");
+  const npcEffect = effect.type === "npc_event" ? effect : undefined;
+  expect(npcEffect?.npcId).toBe(action.npcId);
+  expect(npcEffect?.eventType).toBe(action.payload.eventType);
+  expect(npcEffect?.data).toEqual(action.payload.data);
 
   const npc = state.npcs.get(action.npcId);
   expect(npc).toBeDefined();
@@ -305,11 +307,12 @@ describe("ActionHandlerService", () => {
 
     expectApplied(result);
     expect(result.effects).toHaveLength(1);
-    const effect = result.effects[0];
-    expect(effect.type).toBe("scripted_event");
-    expect(effect.scriptId).toBe(action.scriptId);
-    expect(effect.eventType).toBe(action.payload.eventType);
-    expect(effect.data).toEqual(action.payload.data);
+  const effect = result.effects[0];
+  expect(effect.type).toBe("scripted_event");
+  const scriptedEffect = effect.type === "scripted_event" ? effect : undefined;
+  expect(scriptedEffect?.scriptId).toBe(action.scriptId);
+  expect(scriptedEffect?.eventType).toBe(action.payload.eventType);
+  expect(scriptedEffect?.data).toEqual(action.payload.data);
     expect(state.tick).toBe(action.requestedTick ?? action.timestamp);
   });
 });

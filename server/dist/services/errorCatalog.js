@@ -1,4 +1,4 @@
-import { ErrorCodeRegistry, mapDefinitionToEntry } from "@@/models/errorCodes.js";
+import { ErrorCodeRegistry, mapDefinitionToEntry } from "../models/errorCodes.js";
 function sortEntries(entries) {
     return [...entries].sort((a, b) => {
         const aCode = Number.parseInt(a.numericCode.slice(1), 10);

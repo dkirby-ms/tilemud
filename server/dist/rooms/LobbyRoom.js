@@ -1,7 +1,7 @@
 import { Room, matchMaker } from "colyseus";
 import { Schema, MapSchema, defineTypes } from "@colyseus/schema";
 import { randomUUID } from "node:crypto";
-import { RuleSetNotFoundError } from "@@/services/rulesetService.js";
+import { RuleSetNotFoundError } from "../services/rulesetService.js";
 class LobbyInstanceState extends Schema {
     instanceId = "";
     roomId = "";

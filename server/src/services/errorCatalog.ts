@@ -5,7 +5,7 @@ import {
   ErrorDefinition,
   ErrorReason,
   mapDefinitionToEntry
-} from "@@/models/errorCodes.js";
+} from "../models/errorCodes.js";
 
 export interface ErrorCatalogServiceOptions {
   /** Optional predicate for filtering catalog entries (e.g. feature flags). */

@@ -1,5 +1,5 @@
-import { getActionPriorityDescriptor, isTilePlacementAction } from "@@/actions/actionRequest.js";
-import { compareActionRequests } from "@@/actions/ordering.js";
+import { getActionPriorityDescriptor, isTilePlacementAction } from "../actions/actionRequest.js";
+import { compareActionRequests } from "../actions/ordering.js";
 const DEFAULT_MAX_QUEUE_SIZE = 512;
 export class ActionPipeline {
     rateLimiter;

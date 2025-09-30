@@ -5,10 +5,7 @@ import {
   type BattleRoomDependencies,
   type BattleRoomCreateOptions
 } from "./BattleRoom.js";
-import {
-  RuleSetNotFoundError,
-  type RuleSetDetail
-} from "@@/services/rulesetService.js";
+import { RuleSetNotFoundError, type RuleSetDetail } from "../services/rulesetService.js";
 
 interface LoggerLike {
   info?: (...args: unknown[]) => void;

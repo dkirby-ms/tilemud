@@ -1,4 +1,4 @@
-import { TileMudError } from "@@/models/errorCodes.js";
+import { TileMudError } from "../models/errorCodes.js";
 const DEFAULT_MESSAGE_LIMIT = 50;
 const MAX_MESSAGE_LIMIT = 100;
 const MAX_CONTENT_LENGTH = 2000;

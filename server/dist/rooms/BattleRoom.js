@@ -1,9 +1,9 @@
 import { Room } from "colyseus";
-import { parseActionRequest, isTilePlacementAction } from "@@/actions/actionRequest.js";
-import { ActionHandlerService } from "@@/actions/handlers.js";
-import { ActionPipeline } from "@@/services/actionPipeline.js";
-import { PlayerSessionState, createBattleRoomState } from "@@/state/battleRoomState.js";
-import { TileMudError } from "@@/models/errorCodes.js";
+import { parseActionRequest, isTilePlacementAction } from "../actions/actionRequest.js";
+import { ActionHandlerService } from "../actions/handlers.js";
+import { ActionPipeline } from "../services/actionPipeline.js";
+import { PlayerSessionState, createBattleRoomState } from "../state/battleRoomState.js";
+import { TileMudError } from "../models/errorCodes.js";
 const ACTION_MESSAGE = "action.submit";
 const ACTION_QUEUED = "action.queued";
 const ACTION_APPLIED = "action.applied";

@@ -1,8 +1,8 @@
 import type {
-  CreateRuleSetData,
+  CreateRuleSetData as _CreateRuleSetData,
   RuleSetRepository,
   RuleSetVersion
-} from "@@/models/rulesetRepository.js";
+} from "../models/rulesetRepository.js";
 
 export interface InitialTilePlacement {
   x: number;

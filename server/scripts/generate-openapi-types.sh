@@ -14,3 +14,14 @@ fi
 mkdir -p "$(dirname "${OUTPUT_FILE}")"
 
 npx --yes openapi-typescript "${FEATURE_CONTRACT}" --output "${OUTPUT_FILE}"
+
+# Append signature marker used by openapi.sync.spec.ts
+SIG=$(grep -E '^paths:' -n "${FEATURE_CONTRACT}" >/dev/null; awk '/^paths:/,0' "${FEATURE_CONTRACT}" | grep -E '^  /' | awk '{print $1}' ; awk '/^components:/,0' "${FEATURE_CONTRACT}" | awk '/^    [A-Za-z0-9_]+:$/ {gsub(":","",$1); print $1}')
+# Fallback simpler: hash entire file if above fails
+if [[ -z "${SIG}" ]]; then
+  SIG_CONTENT=$(cat "${FEATURE_CONTRACT}")
+else
+  SIG_CONTENT="${SIG}"
+fi
+SHORT_HASH=$(printf "%s" "${SIG_CONTENT}" | sha256sum | cut -c1-16)
+echo -e "\n// OPENAPI_CONTRACT_SIGNATURE: ${SHORT_HASH}" >> "${OUTPUT_FILE}"

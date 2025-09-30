@@ -1,9 +1,9 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { getPostgresClient, initializePostgres } from "@@/infra/postgres.js";
-import { getConfig } from "@@/infra/config.js";
-import type { AppLogger } from "@@/logging/logger.js";
+import { getPostgresClient, initializePostgres } from "../infra/postgres.js";
+import { getConfig } from "../infra/config.js";
+import type { AppLogger } from "../logging/logger.js";
 
 export interface RunMigrationsOptions {
   migrationsDir?: string;

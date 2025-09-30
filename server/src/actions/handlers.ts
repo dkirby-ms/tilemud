@@ -11,14 +11,14 @@ import {
   type PlacementRules,
   TilePlacementValidationError
 } from "./validation.js";
-import type { BattleRoomState } from "@@/state/battleRoomState.js";
-import { NpcState } from "@@/state/battleRoomState.js";
+import type { BattleRoomState } from "../state/battleRoomState.js";
+import { NpcState } from "../state/battleRoomState.js";
 import type {
   RuleSetDetail,
   RuleSetPlacementRules,
   RuleSetService
 } from "@@/services/rulesetService.js";
-import { TileMudError } from "@@/models/errorCodes.js";
+import { TileMudError } from "../models/errorCodes.js";
 
 type PlacementAdjacency = PlacementRules["adjacency"];
 

@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
-import { initializeContainer, shutdownContainer } from "@@/infra/container.js";
-import type { AppLogger } from "@@/logging/logger.js";
+import { initializeContainer, shutdownContainer } from "../infra/container.js";
+import type { AppLogger } from "../logging/logger.js";
 
 export interface PurgeOptions {
   retentionDays?: number; // default 30

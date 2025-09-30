@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { RateLimitError } from "@@/models/errorCodes.js";
+import { RateLimitError } from "../models/errorCodes.js";
 const DEFAULT_CHANNEL_CONFIG = {
     chat_in_instance: {
         windows: [{ durationMs: 10_000, limit: 20 }]

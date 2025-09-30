@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
-import { initializeContainer, shutdownContainer } from "@@/infra/container.js";
-import type { AppLogger } from "@@/logging/logger.js";
+import { initializeContainer, shutdownContainer } from "../infra/container.js";
+import type { AppLogger } from "../logging/logger.js";
 
 /** Example baseline rule set. In a real system this could load from JSON or external source. */
 const BASE_RULESET = {

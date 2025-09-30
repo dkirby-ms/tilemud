@@ -1,4 +1,4 @@
-import { TileMudError } from "@@/models/errorCodes.js";
+import { TileMudError } from "../models/errorCodes.js";
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
 function clampLimit(limit) {

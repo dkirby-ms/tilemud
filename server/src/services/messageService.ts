@@ -3,8 +3,8 @@ import type {
   PrivateMessageRepository,
   CreatePrivateMessageData,
   MessageThread
-} from "@@/models/privateMessageRepository.js";
-import { TileMudError } from "@@/models/errorCodes.js";
+} from "../models/privateMessageRepository.js";
+import { TileMudError } from "../models/errorCodes.js";
 import { RateLimiterService, RateLimitDecision } from "./rateLimiter.js";
 
 export type MessageDirection = "inbound" | "outbound" | "both";

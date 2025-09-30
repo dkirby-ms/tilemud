@@ -1,14 +1,16 @@
-import { Pool, PoolClient } from "pg";
+import pg from "pg";
+const { Pool } = pg;
+import type { PoolClient, Pool as PoolType } from "pg";
 import { getConfig } from "./config.js";
 
-let pool: Pool | null = null;
+let pool: PoolType | null = null;
 
 export interface PostgresClient {
   query: PoolClient["query"];
   release: () => void;
 }
 
-export async function initializePostgres(): Promise<Pool> {
+export async function initializePostgres(): Promise<PoolType> {
   if (pool) {
     return pool;
   }
@@ -71,6 +73,6 @@ export async function closePostgres(): Promise<void> {
   }
 }
 
-export function getPool(): Pool | null {
+export function getPool(): PoolType | null {
   return pool;
 }

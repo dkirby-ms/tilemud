@@ -217,4 +217,78 @@ describe("ReconnectService", () => {
     expect(allSessions).toHaveLength(1);
     expect(allSessions[0].instanceId).toBe("instance-beta");
   });
+
+  it("computes session stats accurately", async () => {
+    const service = createService(() => Date.now());
+
+    await service.createSession({
+      playerId: "p-stat-1",
+      instanceId: "inst-a",
+      sessionId: "sess-1",
+      playerState: basePlayerState,
+      gracePeriodMs: 30_000
+    });
+    vi.advanceTimersByTime(1000);
+    await service.createSession({
+      playerId: "p-stat-2",
+      instanceId: "inst-a",
+      sessionId: "sess-2",
+      playerState: basePlayerState,
+      gracePeriodMs: 60_000
+    });
+    await service.createSession({
+      playerId: "p-stat-3",
+      instanceId: "inst-b",
+      sessionId: "sess-3",
+      playerState: basePlayerState,
+      gracePeriodMs: 90_000
+    });
+
+    const stats = await service.getSessionStats();
+    expect(stats.totalActive).toBe(3);
+    expect(stats.byInstance["inst-a"]).toBe(2);
+    expect(stats.byInstance["inst-b"]).toBe(1);
+    expect(stats.averageGracePeriodMs).toBeGreaterThan(30_000);
+    expect(stats.oldestDisconnectionMs).toBeGreaterThanOrEqual(1000);
+  });
+
+  it("returns null for corrupted session JSON and cleans it up", async () => {
+    const clock = () => Date.now();
+    const redis = createMockRedis(clock);
+    const service = new ReconnectService({
+      redis: redis as unknown as RedisClientType,
+      clock,
+      keyPrefix: "corrupt:" 
+    });
+
+    await service.createSession({
+      playerId: "p-corrupt",
+      instanceId: "inst-x",
+      sessionId: "sess-x",
+      playerState: basePlayerState
+    });
+
+    // Overwrite raw value with invalid JSON
+    await (redis as any).setEx("corrupt:session:p-corrupt:inst-x", 60, "{not-json}");
+    const fetched = await service.getSession("p-corrupt", "inst-x");
+    expect(fetched).toBeNull();
+  });
+
+  it("returns false when updating state for expired session", async () => {
+    const service = createService(() => Date.now());
+    await service.createSession({
+      playerId: "p-expire",
+      instanceId: "inst-exp",
+      sessionId: "sess-exp",
+      playerState: basePlayerState,
+      gracePeriodMs: 1000
+    });
+    vi.advanceTimersByTime(1200);
+    const updated = await service.updatePlayerState({
+      playerId: "p-expire",
+      instanceId: "inst-exp",
+      patch: { lastActionTick: 99 }
+    });
+    expect(updated).toBe(false);
+  });
 });

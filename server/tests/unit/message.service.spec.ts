@@ -172,4 +172,41 @@ describe("MessageService", () => {
       }
     ]);
   });
+
+  it("lists inbound, outbound, and both directions distinctly", async () => {
+    const inbound = [
+      makeMessage({ id: "in1", recipientId: "alice", senderId: "bob", createdAt: new Date("2025-01-01T00:00:00Z") }),
+      makeMessage({ id: "in2", recipientId: "alice", senderId: "carl", createdAt: new Date("2025-01-01T00:01:00Z") })
+    ];
+    const outbound = [
+      makeMessage({ id: "out1", senderId: "alice", recipientId: "bob", createdAt: new Date("2025-01-01T00:02:00Z") })
+    ];
+    repositoryMocks.findByRecipient.mockResolvedValue(inbound);
+    repositoryMocks.findBySender.mockResolvedValue(outbound);
+
+    const inboundResult = await service.listMessagesForPlayer("alice", { direction: "inbound", limit: 10 });
+    expect(inboundResult.items.map(m => m.id)).toEqual(["in2", "in1"]);
+
+    const outboundResult = await service.listMessagesForPlayer("alice", { direction: "outbound", limit: 10 });
+    expect(outboundResult.items.map(m => m.id)).toEqual(["out1"]);
+
+    const bothResult = await service.listMessagesForPlayer("alice", { direction: "both", limit: 10 });
+    expect(bothResult.items.map(m => m.id)).toEqual(["out1", "in2", "in1"]);
+  });
+
+  it("markMessagesAsRead is a no-op for empty list", async () => {
+    await service.markMessagesAsRead([]);
+    expect(repositoryMocks.markAsRead).not.toHaveBeenCalled();
+  });
+
+  it("purge helpers proxy to repository", async () => {
+    repositoryMocks.purgeOldMessages.mockResolvedValue(5);
+    repositoryMocks.purgeConversation.mockResolvedValue(2);
+    const purgedOld = await service.purgeOldMessages(30);
+    const purgedConv = await service.purgeConversation("alice", "bob");
+    expect(purgedOld).toBe(5);
+    expect(purgedConv).toBe(2);
+    expect(repositoryMocks.purgeOldMessages).toHaveBeenCalledWith(30);
+    expect(repositoryMocks.purgeConversation).toHaveBeenCalledWith("alice", "bob");
+  });
 });

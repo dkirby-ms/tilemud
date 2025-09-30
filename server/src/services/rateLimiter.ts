@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import type { RedisClientType } from "redis";
-import { RateLimitError } from "@@/models/errorCodes.js";
+import { RateLimitError } from "../models/errorCodes.js";
 
 export interface RateLimitWindow {
   durationMs: number;

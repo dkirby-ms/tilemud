@@ -4,8 +4,8 @@ import type {
   CreateBattleOutcomeData,
   OutcomeData,
   PlayerStatistics
-} from "@@/models/battleOutcomeRepository.js";
-import { TileMudError } from "@@/models/errorCodes.js";
+} from "../models/battleOutcomeRepository.js";
+import { TileMudError } from "../models/errorCodes.js";
 
 interface OutcomeServiceDependencies {
   repository: BattleOutcomeRepository;

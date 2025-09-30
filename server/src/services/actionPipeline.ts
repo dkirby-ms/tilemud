@@ -1,5 +1,5 @@
-import { type ActionRequest, getActionPriorityDescriptor, isTilePlacementAction } from "@@/actions/actionRequest.js";
-import { compareActionRequests } from "@@/actions/ordering.js";
+import { type ActionRequest, getActionPriorityDescriptor, isTilePlacementAction } from "../actions/actionRequest.js";
+import { compareActionRequests } from "../actions/ordering.js";
 import type { RateLimitDecision, RateLimiterService } from "./rateLimiter.js";
 
 export type EnqueueRejectionReason = "duplicate" | "queue_full";

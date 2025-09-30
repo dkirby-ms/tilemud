@@ -12,7 +12,7 @@ import { OutcomeService } from "../services/outcomeService.js";
 import { ReconnectService } from "../services/reconnectService.js";
 import { ActionPipeline } from "../services/actionPipeline.js";
 import { RuleSetService } from "../services/rulesetService.js";
-import { getAppLogger } from "@@/logging/logger.js";
+import { getAppLogger } from "../logging/logger.js";
 let container = null;
 export async function initializeContainer() {
     if (container) {
