@@ -136,9 +136,9 @@
 - [x] T069 Run lint & fmt sweep, remove dead code, ensure ESLint passes (Depends on: T055)
 
 ## Phase 3.6: Verification & Sign-off
-- [ ] T070 Aggregate coverage report ≥80% critical paths, archive in `server/docs/coverage-summary.md` (Depends on: T061–T069)
-- [ ] T071 Record exploratory testing notes `server/docs/exploratory-notes.md` (Depends on: T070)
-- [ ] T072 Update `.github/copilot-instructions.md` recent changes with backend additions (Depends on: T070)
+- [x] T070 Aggregate coverage report ≥80% critical paths, archive in `server/docs/coverage-summary.md` (Depends on: T061–T069)
+- [x] T071 Record exploratory testing notes `server/docs/exploratory-notes.md` (Depends on: T070)
+- [x] T072 Update `.github/copilot-instructions.md` recent changes with backend additions (Depends on: T070)
 
 ---
 

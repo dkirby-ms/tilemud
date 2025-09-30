@@ -13,11 +13,12 @@ export default defineConfig({
     include: [normalizeGlob(resolve(rootDir, "tests/**/*.spec.ts"))],
     setupFiles: [normalizeGlob(resolve(rootDir, "tests/setup.ts"))],
     coverage: {
+      provider: "istanbul",
       reporter: ["text", "lcov"],
-      include: [normalizeGlob(resolve(rootDir, "src/**/*.ts"))],
+      include: [normalizeGlob("src/**/*.ts")],
       exclude: [
-        normalizeGlob(resolve(rootDir, "src/contracts/**")),
-        normalizeGlob(resolve(rootDir, "src/index.ts"))
+        normalizeGlob("src/contracts/**"),
+        normalizeGlob("src/index.ts")
       ]
     },
     watch: false

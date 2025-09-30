@@ -30,8 +30,8 @@ TypeScript 5.x (ES2022 target): Follow standard conventions
 
 ## Recent Changes
 - 004-i-want-to: Added TypeScript (Node.js 20 LTS) + Colyseus v0.16 (server), colyseus.js (client dependency already noted in constitution), Express 5 (HTTP API), zod (validation), pg (PostgreSQL driver), node-redis v5, pino (structured logging)
+- 004-i-want-to: Added TypeScript (Node.js 20 LTS) + Colyseus v0.16 (server), colyseus.js (client dependency already noted in constitution), Express 5 (HTTP API), zod (validation), pg (PostgreSQL driver), node-redis v5, pino (structured logging)
 - 001-persistent-character-creation: Added TypeScript 5.x (ES2022 target) + React 18, Vite 5, `@azure/msal-browser` (Entra ID auth), `zustand` state store, `react-router-dom`, Testing Library
-- 003-the-developer-needs: Added Docker-based local development infrastructure with PostgreSQL and Redis, migration system, environment configuration, verification tooling, and management scripts
 
 <!-- MANUAL ADDITIONS START -->
 ## Infrastructure (003-the-developer-needs)
