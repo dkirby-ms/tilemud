@@ -101,8 +101,8 @@
 - [x] T042 Implement action ordering comparator `server/src/actions/ordering.ts` (Depends on: T031)
 - [x] T043 Implement action handlers `server/src/actions/handlers.ts` applying mutations to state (Depends on: T041, T042, T032)
 - [x] T044 Implement BattleRoom `server/src/rooms/BattleRoom.ts` integrating services & action pipeline (Depends on: T032, T033, T034, T036, T037, T038, T039, T040, T043)
-- [ ] T045 Implement LobbyRoom `server/src/rooms/LobbyRoom.ts` for matchmaking & instance creation (Depends on: T044)
-- [ ] T046 Register rooms & bootstrap with Colyseus server `server/src/rooms/registerRooms.ts` (Depends on: T044, T045)
+- [x] T045 Implement LobbyRoom `server/src/rooms/LobbyRoom.ts` for matchmaking & instance creation (Depends on: T044)
+- [x] T046 Register rooms & bootstrap with Colyseus server `server/src/rooms/registerRooms.ts` (Depends on: T044, T045)
 
 ### HTTP API Endpoints (from contracts/game-service.yaml)
 - [ ] T047 Implement health router `server/src/api/health.ts` (Depends on: T051)
