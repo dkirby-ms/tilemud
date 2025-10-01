@@ -21,7 +21,10 @@ Prereqs: Docker (for infra scripts), Node.js 20.x, GNU bash.
 cd server
 npm install
 
-# 3. Build & run migrations + seed baseline rule set
+# 3. Create an env file (first time only)
+cp .env.example .env
+
+# 4. Build & run migrations + seed baseline rule set
 npm run build
 npm run migrate
 npm run seed:ruleset
@@ -40,6 +43,8 @@ The server listens on `PORT` (default 4000). Real‑time Colyseus rooms share th
 | `PORT` | Yes | HTTP/WS listen port |
 | `LOG_LEVEL` | No  | Pino log level (default info) |
 | `LOG_PRETTY` | No | If `true`, enable pino-pretty transport |
+
+Place your environment variables in `server/.env` (or `server/.env.local`). They are auto‑loaded via `dotenv` for all scripts & dev server. No implicit derivation from infrastructure files is performed.
 
 Misconfiguration produces a startup error (see `config.ts` / env contract test).
 

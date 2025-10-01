@@ -119,8 +119,7 @@
 - [x] T056 Implement migration runner script `server/scripts/run-migrations.ts` used by start-up & CI (Depends on: T001, T002)
 - [x] T057 Implement baseline ruleset seed script `server/scripts/seed-ruleset.ts` (Depends on: T025, T056)
 - [x] T058 Implement private message purge job `server/scripts/purge-private-messages.ts` (Depends on: T027)
-- [ ] T057 Implement baseline ruleset seed script `server/scripts/seed-ruleset.ts` (Depends on: T025, T056)
-- [ ] T058 Implement private message purge job `server/scripts/purge-private-messages.ts` (Depends on: T027)
+	> NOTE: Duplicate unchecked entries for T057/T058 removed (both are completed and sources exist).
 - [x] T059 Add OpenAPI sync regression test `server/tests/contract/openapi.sync.spec.ts` comparing compiled types to `game-service.yaml` (simplified: validates presence + signature marker) (Depends on: T006)
 - [x] T060 Add environment contract test `server/tests/contract/env.missing-config.spec.ts` ensuring server fails gracefully without required vars (Depends on: T055)
 
@@ -132,6 +131,7 @@
 - [x] T065 [P] Capture security review checklist `server/docs/security-review.md` (Depends on: T054)
 - [x] T066 [P] Build latency harness script `server/scripts/latency-harness.ts` simulating multiple clients (Depends on: T044, T055)
 - [x] T067 [P] Automate quickstart validation `server/scripts/validate-quickstart.ts` invoking core flows (Depends on: T066)
+	> Current State Note: Source files for latency harness & quickstart validator reside at `server/src/scripts/latency-harness.ts` and `server/src/scripts/validate-quickstart.ts`, while tasks (and npm scripts) reference `server/scripts/`. This mismatch may cause runtime path issues after build (`dist/scripts/*.js` not emitted). Follow-up cleanup tasks added below.
 - [x] T068 Update feature `quickstart.md` with verified steps and adjustments (Depends on: T067)
 - [x] T069 Run lint & fmt sweep, remove dead code, ensure ESLint passes (Depends on: T055)
 
@@ -180,3 +180,22 @@ task-agent run T033 T034 T035 T036 T037 T038 T039 T040
 ---
 
 Ready for Phase 3 execution.
+
+## Phase 3.7: Post-Completion Cleanup (New)
+The following tasks were not part of the original plan but are identified during task list review to reconcile repository state inconsistencies.
+
+- [x] T073 [P] Reconcile script locations for latency & quickstart validators: either move `server/src/scripts/latency-harness.ts` & `validate-quickstart.ts` to `server/scripts/` or adjust `package.json` scripts to point to `dist/src/scripts/*.js` (Depends on: T066, T067)
+- [x] T074 [P] Remove duplicate script copies (run-migrations, seed-ruleset, purge-private-messages) ensuring a single authoritative source & update build docs (Depends on: T073)
+
+## Phase 3.8: Hardening & Guardrails (Proposed)
+- [ ] T075 [P] Add migration idempotency test `server/tests/contract/migrations.idempotent.spec.ts` (run migrations twice, assert no errors) (Depends on: T056)
+- [ ] T076 [P] Add script parity test `server/tests/unit/scripts.parity.spec.ts` ensuring no TS sources exist under `server/scripts/` (Depends on: T073, T074)
+- [ ] T077 Add latency harness regression test `server/tests/perf/latency.regression.spec.ts` gated by env `RUN_LATENCY_CHECK` (Depends on: T066)
+- [ ] T078 Add lightweight metrics endpoint `server/src/api/metrics.ts` + contract test (Depends on: T052)
+- [ ] T079 [P] Outcome repository transaction test `server/tests/unit/outcome.transaction.spec.ts` (Depends on: T037)
+- [ ] T080 Introduce shared types package scaffold `shared/` and move stable DTOs (Depends on: T028, T050)
+- [ ] T081 Add `server/Dockerfile` + compose service entry & doc update (Depends on: T055)
+- [ ] T082 [P] Security headers middleware + test `server/tests/contract/headers.security.spec.ts` (Depends on: T052)
+- [ ] T083 [P] Error code catalog drift test `server/tests/unit/error.codes.drift.spec.ts` (Depends on: T028, T050)
+
+After completing T075–T083, reassess for next scaling feature.

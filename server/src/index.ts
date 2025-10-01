@@ -1,3 +1,4 @@
+import "./infra/envBootstrap.js"; // Load environment (.env / infra) before anything else
 import { createServer as createHttpServer, type Server as HttpServer } from "node:http";
 import { Server as ColyseusServer } from "colyseus";
 import { createApp } from "./api/app.js";
