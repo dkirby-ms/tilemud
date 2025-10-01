@@ -57,18 +57,18 @@
 - [ ] T027 [P] Client reducer test for applying event.state_delta in `web-client/tests/contract/state-delta.reducer.spec.ts`
 
 ### Performance & Freshness Tests (Added for Critical Coverage Gaps)
-- [ ] T074 [P] Initial load performance test (FR-002, NFR-002) measuring cold start client load p95 ≤3s in `web-client/tests/integration/initial-load-performance.spec.ts`
-- [ ] T075 [P] Freshness window enforcement test (FR-005) simulating stale cache (>100ms) triggering forced refresh in `server/tests/integration/freshness-window.spec.ts`
+- [ ] T074 [FR-002][NFR-002][P] Initial load performance test measuring cold start client load p95 ≤3s in `web-client/tests/integration/initial-load-performance.spec.ts`
+- [ ] T075 [FR-005][NFR-001][P] Freshness window enforcement test simulating stale cache (>100ms) triggering forced refresh in `server/tests/integration/freshness-window.spec.ts`
 
 ### Additional Coverage Tests (High Severity Gaps)
-- [ ] T076 [P] Atomic multi-step rollback test (FR-011) inducing partial failure and asserting ACTION_ATOMIC_ROLLBACK in `server/tests/contract/atomic-action-rollback.spec.ts`
-- [ ] T077 [P] Authorization isolation test (FR-013, NFR-006) ensuring cross-user access denied with FORBIDDEN in `server/tests/contract/authorization-isolation.spec.ts`
-- [ ] T078 [P] Restart recovery persistence test (FR-016, NFR-004) simulating server restart + reconnect without acknowledged action loss in `server/tests/integration/restart-recovery.spec.ts`
-- [ ] T079 [P] Error contract schema test (FR-020) validating canonical error shape & categories in `server/tests/contract/error-contract.spec.ts`
-- [ ] T080 [P] Capacity + invalid token UX test (FR-001, FR-015) covering capacity denial & token rejection messaging in `server/tests/integration/capacity-auth-failures.spec.ts`
-- [ ] T081 [P] Metrics threshold detection test (FR-019, NFR-008) asserting alert conditions are triggered under simulated failure ratios in `server/tests/integration/metrics-threshold.spec.ts`
-- [ ] T082 [P] Log redaction verification test (FR-014, NFR-007) scanning emitted logs for prohibited fields in `server/tests/integration/log-redaction.spec.ts`
-- [ ] T083 [P] Client diagnostics overlay test (Constitution, NFR-001) verifying latency + reconnect indicators visible in dev build `web-client/tests/contract/client-diagnostics.spec.ts`
+- [ ] T076 [FR-011][P] Atomic multi-step rollback test inducing partial failure and asserting ACTION_ATOMIC_ROLLBACK in `server/tests/contract/atomic-action-rollback.spec.ts`
+- [ ] T077 [FR-013][NFR-006][P] Authorization isolation test ensuring cross-user access denied with FORBIDDEN in `server/tests/contract/authorization-isolation.spec.ts`
+- [ ] T078 [FR-016][NFR-004][P] Restart recovery persistence test simulating server restart + reconnect without acknowledged action loss in `server/tests/integration/restart-recovery.spec.ts`
+- [ ] T079 [FR-020][P] Error contract schema test validating canonical error shape & categories in `server/tests/contract/error-contract.spec.ts`
+- [ ] T080 [FR-001][FR-015][P] Capacity + invalid token UX test covering capacity denial & token rejection messaging in `server/tests/integration/capacity-auth-failures.spec.ts`
+- [ ] T081 [FR-019][NFR-008][P] Metrics threshold detection test asserting alert conditions are triggered under simulated failure ratios in `server/tests/integration/metrics-threshold.spec.ts`
+- [ ] T082 [FR-014][NFR-007][P] Log redaction verification test scanning emitted logs for prohibited fields in `server/tests/integration/log-redaction.spec.ts`
+- [ ] T083 [NFR-008][NFR-001][P] Client diagnostics overlay test verifying latency + reconnect indicators visible in dev build `web-client/tests/contract/client-diagnostics.spec.ts`
 
 ## Phase 3.3: Core Models & Schemas (Implement after corresponding tests failing)
 - [ ] T028 [P] Implement CharacterProfile model + repository in `server/src/models/characterProfile.ts`

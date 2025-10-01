@@ -1,7 +1,7 @@
 
-# Implementation Plan: Integrate Server, Web Client, and Backing Data Layers
+# Implementation Plan: 005-integrate-the-server
 
-**Branch**: `005-integrate-the-server` | **Date**: 2025-10-01 | **Spec**: /specs/005-integrate-the-server/spec.md
+**Branch**: `005-integrate-the-server` | **Date**: 2025-10-01 | **Spec**: `./spec.md`
 **Input**: Feature specification from `/specs/005-integrate-the-server/spec.md`
 
 ## Execution Flow (/plan command scope)
@@ -31,31 +31,36 @@
 - Phase 3-4: Implementation execution (manual or via tools)
 
 ## Summary
-Integrate the authoritative game server with the existing React/Vite web client to enable real-time authenticated sessions, per-action durability to PostgreSQL, transient performance optimization via Redis, strict client/server version lockstep, sub-200ms p95 action latency, ≤3s p95 initial load, and ≤100ms freshness window for critical state. The integration ensures every acknowledged state-mutating action is durably persisted before confirmation while supporting graceful reconnect, strict token-based session establishment via external IdP (OAuth2/SSO), and prevention of stale state exposure. Technical approach centers on server-authoritative messaging (Colyseus-based), session + action lifecycle instrumentation, cache-as-accelerator (never source of truth), and well-defined contracts for client intents and server outcomes.
+Integrate the authoritative multiplayer game server into the existing repository and connect the React web client to it with end‑to‑end, test‑driven implementation. Core goals:
+1. Establish server authoritative real‑time session (Colyseus) with strict version lockstep (FR-001/FR-002) and freshness window (FR-005; ≤100ms p95).
+2. Provide durable per‑action persistence (FR-006) with atomic rollback on partial failure (FR-011) and restart recovery reconstruction from durable logs (FR-012).
+3. Implement reconnect flow with exponential full‑jitter backoff and token validation (FR-008/FR-009) while preserving session continuity metrics.
+4. Expose consistent typed contracts (messages + REST where needed) validated via zod and contract tests (FR-003/FR-004).
+5. Deliver observability: structured redacted logging, metrics enumeration (FR-019 / NFR-008), client diagnostics overlay (FR-018) and performance conformance to NFR-001 (action latency ≤200ms p95) and NFR-002 (initial load ≤3s p95, stretch 2s).
+6. Enforce security/privacy constraints (single PLAYER role, no raw credentials in logs, hashed session identifiers) and prepare extension surface for future roles without over‑design.
+
+All NEEDS CLARIFICATION markers in the original spec have been resolved; remaining open items are strategic follow‑ups (not blockers) documented below.
 
 ## Technical Context
-**Language/Version**: TypeScript 5.x (Node.js 20 LTS backend + React 18 frontend)  
-**Primary Dependencies**: Colyseus (real-time sessions), Express (HTTP API), Vite/React (client), zod (validation), pg (PostgreSQL driver), node-redis, pino (logging)  
-**Storage**: PostgreSQL (durable player + world state), Redis (ephemeral cache, transient acceleration, presence)  
-**Testing**: Vitest + Testing Library (frontend), Vitest (backend unit/integration), contract/integration test suites under `server/tests` and `web-client/tests`  
-**Target Platform**: Linux (dev + containerized local infra) / browser clients (desktop modern evergreen)  
+**Language/Version**: TypeScript 5.x (Node.js 20 LTS backend, React 18 frontend)  
+**Primary Dependencies**: Colyseus, Express 5, zod, pg, node-redis, pino, Vite 5, Testing Library  
+**Storage**: PostgreSQL (durable state), Redis (ephemeral cache/presence)  
+**Testing**: Vitest (unit/contract/integration), Testing Library (web client)  
+**Target Platform**: Linux dev/runtime, modern evergreen browsers  
 **Project Type**: Web (frontend + backend + shared contracts)  
-**Performance Goals**: ≤3s p95 initial load; ≤200ms p95 action round-trip; 0 acknowledged action loss; 100ms freshness window p95  
-**Constraints**: Server authoritative; strict version lockstep; per-action durability pre-ack; cache never sole source of truth; external IdP token validation  
-**Scale/Scope**: Initial target concurrency (NEEDS CLARIFICATION: baseline & stretch) left open; design to allow horizontal room sharding.
+**Performance Goals**: ≤3s p95 initial load (NFR-002), ≤200ms p95 action latency (NFR-001), freshness ≤100ms p95 (FR-005)  
+**Constraints**: Server authoritative, per-action durability pre-ack, strict version lockstep, cache not source of truth  
+**Scale/Scope**: Baseline 500 concurrent active sessions / node; stretch 1500 via horizontal room sharding (NFR-005)
 
 ## Constitution Check
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-Constitution (v1.0.0) Key Principles Mapping:
-- Thin Client / Server-Authoritative: Plan enforces server validation, client intent messages only (compliant).
-- Real-time First: Uses existing WebSocket (Colyseus) diff/state events; latency budgets captured (compliant).
-- Efficiency: Will add contract-driven minimal payloads + avoid redundant full state pushes (design commitment). Bundle size not directly altered; monitor during implementation.
-- Type-Safety: Shared TypeScript types and generated API/room schema definitions (plan to generate under `server/src/contracts` + client-mapped types) (compliant).
-- Testing: Contract tests (server), integration connect/reconnect flows, client state reducer tests (planned) (compliant).
-- Observability: Metrics & structured logging enumerated (FR-019 placeholder to refine). Need to finalize required metrics list (open question).
+Constitution v1.0.0 principles mapping:
+- Thin Client / Server Authoritative: Colyseus authoritative room logic; clients send intents only.
+- Real-time First & Efficiency: WebSocket diff strategy; latency budgets codified (NFR-001, NFR-002).
+- Type-Safe & Testable & Observable: Strict TS, contract tests (T008–T020), diagnostics overlay (T083), metrics (FR-019/NFR-008).
 
-Pre-Phase 0 Gate Result: PASS (Remaining open questions: reconnect retry policy, rollback semantics, outage messaging, roles, metrics list, scale numbers, inactivity timeout, privacy boundaries, consistency ordering model. These do not block baseline design artifacts; they will be annotated as TBD.)
+Status: PASS (no deviations). Diagnostics overlay explicitly planned (T083). Any budget regressions will require justification.
 
 ## Project Structure
 
@@ -70,46 +75,34 @@ specs/[###-feature]/
 └── tasks.md             # Phase 2 output (/tasks command - NOT created by /plan)
 ```
 
-ios/ or android/
 ### Source Code (repository root)
 ```
-server/
+infrastructure/        # Local dev infra: postgres, redis, scripts, migrations
+server/                # Authoritative game + API (Node.js 20 / TypeScript)
    src/
       actions/
       api/
-      infra/
-      logging/
       models/
       rooms/
       services/
       state/
-      types/
+      logging/
    tests/
+      unit/
       contract/
       integration/
-      unit/
-
-web-client/
+web-client/            # React 18 client consuming server contracts
    src/
       app/
-      components/
       features/
-      hooks/
+      components/
       providers/
-      styles/
-      utils/
-   tests/
-      contract/
-      integration/
-      unit/
-
-infrastructure/
-   docker-compose.dev.yml
-   scripts/
-   migrations/
+      hooks/
+      types/
+specs/                 # Feature specs, plans, tasks (this feature = 005)
 ```
 
-**Structure Decision**: Web application (frontend + backend). Enhance with shared contract generation step (server emits types consumed by client). Add new folder `server/src/contracts` for generated stable API + messaging schemas if not already fully present.
+**Structure Decision**: Multi-project monorepo (backend `server`, frontend `web-client`, shared contracts via generation script) chosen to enable type-safe cross-layer evolution without premature package splitting. Additional package extraction deferred until measurable duplication or unstable dependency graph emerges.
 
 ## Phase 0: Outline & Research
 1. **Extract unknowns from Technical Context** above:
@@ -130,20 +123,7 @@ infrastructure/
    - Rationale: [why chosen]
    - Alternatives considered: [what else evaluated]
 
-**Phase 0 Deliverables / Focus Areas**:
-- Reconnect retry policy (propose exponential backoff with jitter, 5 attempts over ~32s cap)
-- Rollback semantics (define atomic action boundaries + compensation strategy: reject vs. compensating inverse event)
-- Outage messaging taxonomy (version mismatch, dependency degraded, reconnecting, read-only mode if needed)
-- Authorization roles (confirm only “player” + potential future “moderator”; current scope: player only)
-- Metrics list (connect_success, reconnect_success_rate, action_latency_p95, stale_refresh_trigger_count, cache_hit_ratio, version_rejects)
-- Scalability baseline (document target concurrency placeholder; propose initial 500 concurrent sessions per node with room partitioning)
-- Inactivity timeout (propose 10 minutes of no action events)
-- Privacy boundaries (no storage of raw personally identifiable info beyond opaque user ID & session token hash)
-- Consistency model on reconnect (last-write-wins with server authoritative sequence ordering; vector clocks out of scope)
-
-research.md will record Decision / Rationale / Alternatives for each above. Any unresolved items after research become explicit blockers before Phase 1 completion.
-
-**Output**: research.md with all currently open NEEDS CLARIFICATION items addressed or explicitly deferred with justification.
+**Output**: research.md with all NEEDS CLARIFICATION resolved
 
 ## Phase 1: Design & Contracts
 *Prerequisites: research.md complete*
@@ -153,16 +133,15 @@ research.md will record Decision / Rationale / Alternatives for each above. Any 
    - Validation rules from requirements
    - State transitions if applicable
 
-2. **Generate API + Real-time Contracts**:
-   - REST endpoints (session bootstrap, health, version check)
-   - Real-time message schemas (intent: move, chat, action; event: state delta, error, ack)
-   - Validation via zod → generate TypeScript types / JSON schema
-   - Output to `/specs/005-integrate-the-server/contracts/` and generated server runtime types to `server/src/contracts`
+2. **Generate API contracts** from functional requirements:
+   - For each user action → endpoint
+   - Use standard REST/GraphQL patterns
+   - Output OpenAPI/GraphQL schema to `/contracts/`
 
-3. **Generate contract tests**:
-   - REST: one test per endpoint (session, health, version)
-   - Real-time: handshake, join room, action dispatch sequencing, invalid token rejection
-   - Assert schema round-trip (encode/decode) + negative cases
+3. **Generate contract tests** from contracts:
+   - One test file per endpoint
+   - Assert request/response schemas
+   - Tests must fail (no implementation yet)
 
 4. **Extract test scenarios** from user stories:
    - Each story → integration test scenario
@@ -177,7 +156,7 @@ research.md will record Decision / Rationale / Alternatives for each above. Any 
    - Keep under 150 lines for token efficiency
    - Output to repository root
 
-**Output**: data-model.md, /contracts/* (REST + real-time), failing contract + integration tests, quickstart.md, updated `.github/copilot-instructions.md` (recent changes block)
+**Output**: data-model.md, /contracts/*, failing tests, quickstart.md, agent-specific file
 
 ## Phase 2: Task Planning Approach
 *This section describes what the /tasks command will do - DO NOT execute during /plan*
@@ -195,9 +174,15 @@ research.md will record Decision / Rationale / Alternatives for each above. Any 
 - Dependency order: Models before services before UI
 - Mark [P] for parallel execution (independent files)
 
-**Estimated Output**: 30-38 numbered tasks (extra real-time schema + durability verification tasks)
+**Estimated Output**: 25-30 numbered, ordered tasks in tasks.md
 
 **IMPORTANT**: This phase is executed by the /tasks command, NOT by /plan
+
+## Open Questions (Strategic, Non-Blocking)
+1. Threat model expansion depth & schedule (baseline privacy/security controls implemented; formal STRIDE review deferred).
+2. Availability escalation policy definition (current NFR baseline 99.5% w/ stretch 99.9%; on-call + SLO error budget process to be codified later).
+3. Cache eviction tuning (initial Redis TTL heuristics; collect production metrics before adaptive policy change).
+4. Localization / i18n strategy (current scope English-only; instrument UI copy enumeration for future extraction pipeline).
 
 ## Phase 3+: Future Implementation
 *These phases are beyond the scope of the /plan command*
@@ -207,30 +192,23 @@ research.md will record Decision / Rationale / Alternatives for each above. Any 
 **Phase 5**: Validation (run tests, execute quickstart.md, performance validation)
 
 ## Complexity Tracking
-*Fill ONLY if Constitution Check has violations that must be justified*
-
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+No deviations from constitution principles at this stage (table intentionally omitted).
 
 
 ## Progress Tracking
-*This checklist is updated during execution flow*
-
 **Phase Status**:
 - [x] Phase 0: Research complete (/plan command)
 - [x] Phase 1: Design complete (/plan command)
-- [x] Phase 2: Task planning complete (/plan command - describe approach only)
-- [ ] Phase 3: Tasks generated (/tasks command)
+- [x] Phase 2: Task planning approach documented (/plan output)
+- [x] Phase 3: Tasks generated (`tasks.md` T001–T083)
 - [ ] Phase 4: Implementation complete
 - [ ] Phase 5: Validation passed
 
 **Gate Status**:
 - [x] Initial Constitution Check: PASS
-- [x] Post-Design Constitution Check: PASS (no new violations introduced)
-- [ ] All NEEDS CLARIFICATION resolved (availability %, threat model depth remain)
-- [ ] Complexity deviations documented
+- [x] Post-Design Constitution Check: PASS
+- [x] All NEEDS CLARIFICATION resolved (all removed from spec)
+- [x] Complexity deviations documented (none required)
 
 ---
 *Based on Constitution v2.1.1 - See `/memory/constitution.md`*
