@@ -101,48 +101,44 @@ As a player using the web client, I can connect to the game server and interact 
 ### Functional Requirements
 Each requirement describes externally observable behavior or obligation of the integrated experience (not internal implementation detail).
 
-- **FR-001**: The system MUST establish a unified session between web client and game server by validating externally issued OAuth2/SSO access tokens from the designated identity provider and rejecting expired or tampered tokens.
-- **FR-002**: The system MUST deliver an initial authoritative state payload (player entity + essential world context) within ≤3s p95 from connection initiation.
-- **FR-003**: The system MUST reflect player-initiated actions in the client UI and propagate to other affected participants with end-to-end action latency ≤200ms p95.
-- **FR-004**: The system MUST persist critical player progress (inventory, stats, character position, key flags) on every state-mutating action before sending success acknowledgment to the client, and also upon session end to finalize any pending state.
-- **FR-005**: The system MUST prevent presentation of stale data older than 100ms (p95) between durable truth and client-visible state for freshness-sensitive fields (position, health, inventory deltas); stale detections trigger forced refresh.
-- **FR-006**: The system MUST continue core gameplay operations when the transient performance layer (cache) is unavailable, without data loss (performance may degrade).
-- **FR-007**: The system MUST guarantee idempotent handling of resubmitted actions after reconnect to avoid duplicates.
-- **FR-008**: The system MUST provide a re-synchronization mechanism after transient disconnect that restores consistent state without manual user intervention (automatic retries) [NEEDS CLARIFICATION: retry limits & intervals].
-- **FR-009**: The system MUST enforce strict build/version lockstep: only clients matching the server's advertised build identifier may establish a session; mismatches are rejected with an update-required response (no multi-version coexistence).
-- **FR-010**: The system MUST validate all client-originated actions against authoritative rules before committing effects; rejected actions return structured errors.
-- **FR-011**: The system MUST ensure atomic application of multi-step state changes (all-or-nothing from player perspective) [NEEDS CLARIFICATION: rollback semantics].
-- **FR-012**: The system MUST expose a readiness/health indication reflecting integration-critical dependencies (durable store reachability, transient cache availability, session capacity).
-- **FR-013**: The system MUST protect user-specific state from access by other users (authorization boundary) [NEEDS CLARIFICATION: role/permission tiers].
-- **FR-014**: The system MUST log session lifecycle events (connect, disconnect, reconnect, version rejection) with retention and privacy constraints [NEEDS CLARIFICATION: retention period + PII policy].
-- **FR-015**: The system MUST provide user-visible error states for dependency outages, version mismatch, capacity limits, and authentication failure.
-- **FR-016**: The system MUST recover gracefully from server restarts so that acknowledged progress is not lost beyond last guaranteed checkpoint.
-- **FR-017**: The system MUST enforce an inactivity timeout after which session resources are released and a reconnect becomes a fresh session.
-- **FR-018**: The system MUST ensure ordering guarantees for sequential player actions within a session (no reordering visible to users).
-- **FR-019**: The system MUST furnish metrics or observable counters for integration success (connect counts, reconnect success rate, action latency distribution) [NEEDS CLARIFICATION: which metrics are mandatory].
-- **FR-020**: The system MUST provide a consistent error contract so the client can distinguish transient vs. terminal failures.
+**FR-001**: The system MUST establish a unified session between web client and game server by validating externally issued OAuth2/SSO access tokens from the designated identity provider and rejecting expired or tampered tokens.
+**FR-002**: The system MUST deliver an initial authoritative state payload (player entity + essential world context) meeting the initial load performance target defined in **NFR-002**.
+**FR-003**: The system MUST reflect player-initiated actions in the client UI and propagate to other affected participants while meeting the action latency budget defined in **NFR-001**.
+**FR-004**: The system MUST persist critical player progress (inventory, stats, character position, key flags) on every state-mutating action before sending success acknowledgment to the client, and also upon session end to finalize any pending state.
+**FR-005**: The system MUST prevent presentation of stale data older than 100ms (p95) between durable truth and client-visible state for freshness-sensitive fields (position, health, inventory deltas); stale detections trigger forced refresh.
+**FR-006**: The system MUST continue core gameplay operations when the transient performance layer (cache) is unavailable, without data loss (performance may degrade).
+**FR-007**: The system MUST guarantee idempotent handling of resubmitted actions after reconnect to avoid duplicates.
+**FR-008**: The system MUST provide a re-synchronization mechanism after transient disconnect that restores consistent state without manual user intervention using exponential backoff with full jitter at ~1s, 2s, 4s, 8s, 16s (max 5 attempts ≈31s total); after exhaustion it surfaces a RETRY_LIMIT_REACHED state.
+**FR-009**: The system MUST enforce strict build/version lockstep: only clients matching the server's advertised build identifier may establish a session; mismatches are rejected with an update-required response (no multi-version coexistence).
+**FR-010**: The system MUST validate all client-originated actions against authoritative rules before committing effects; rejected actions return structured errors.
+**FR-011**: The system MUST ensure atomic application of multi-step state changes (all-or-nothing from player perspective) via a reject-on-failure model: partial internal failures roll back entirely (no partial side effects). Client receives structured error code=ACTION_ATOMIC_ROLLBACK with retryable flag.
+**FR-012**: The system MUST expose a readiness/health indication reflecting integration-critical dependencies (durable store reachability, transient cache availability, session capacity).
+**FR-013**: The system MUST protect user-specific state from access by other users (authorization boundary). Scope: single PLAYER role only (no moderator/admin yet). Cross-user reads/writes must be rejected with error code=FORBIDDEN.
+**FR-014**: The system MUST log session lifecycle events (connect, disconnect, reconnect, version rejection) with 30-day retention. Logs must exclude raw tokens, IP addresses, and personal identifiers beyond opaque user_id + hashed session_id. Sensitive payloads redacted (inventory summarized, error details trimmed).
+**FR-015**: The system MUST provide user-visible error states for dependency outages, version mismatch, capacity limits, and authentication failure.
+**FR-016**: The system MUST recover gracefully from server restarts so that acknowledged progress is not lost beyond last guaranteed checkpoint.
+**FR-017**: The system MUST enforce an inactivity timeout after which session resources are released and a reconnect becomes a fresh session.
+**FR-018**: The system MUST ensure ordering guarantees for sequential player actions within a session (no reordering visible to users).
+**FR-019**: The system MUST furnish metrics: connect_attempts_total, connect_success_total, reconnect_attempts_total, reconnect_success_total, version_reject_total, action_latency_ms histogram, state_refresh_forced_total, cache_hit_ratio gauge, active_sessions_gauge, derived latency_p95.
+**FR-020**: The system MUST provide a consistent error contract: `{ code: string; category: 'AUTH' | 'VERSION' | 'CAPACITY' | 'RATE_LIMIT' | 'VALIDATION' | 'INTERNAL' | 'DEPENDENCY' | 'CONSISTENCY'; message: string; retryable: boolean; correlation_id: string; details?: object }`.
 
 ### Non-Functional / Quality Requirements
-- **NFR-001**: Real-time action round-trip latency: ≤200ms p95 (stretch ≤120ms p95 optional, not required for acceptance).
-- **NFR-002**: Initial state load time: ≤3s p95 (stretch ≤2s p95 optional, not required for acceptance).
-- **NFR-003**: Availability target for integrated gameplay session continuity [NEEDS CLARIFICATION: uptime %].
-- **NFR-004**: Data consistency level on reconnect: 0 acknowledged actions lost (per-action durability); at most 1 in-flight unacknowledged action may be lost if failure occurs before acknowledgment.
-- **NFR-005**: Scalability baseline (concurrent sessions supported) [NEEDS CLARIFICATION: target concurrency].
-- **NFR-006**: Security: No unauthorized cross-user state access (must pass defined authorization tests) [NEEDS CLARIFICATION: threat model].
-- **NFR-007**: Privacy: Logs must exclude sensitive personal identifiers beyond minimal session correlation [NEEDS CLARIFICATION: PII definition].
-- **NFR-008**: Observability: Defined metrics and structured logs must allow detection of > [NEEDS CLARIFICATION: threshold]% failure rate within monitoring interval.
+**NFR-001**: Real-time action round-trip latency: ≤200ms p95 (stretch goal ≤120ms p95; non-blocking).
+**NFR-002**: Initial state load time: ≤3s p95 (stretch goal ≤2s p95; non-blocking).
+**NFR-003**: Availability: ≥99.5% monthly gameplay session continuity (stretch ≥99.9%). Measured as successful action acknowledgments / attempted actions excluding planned maintenance.
+**NFR-004**: Data consistency on reconnect: 0 acknowledged actions lost (per-action durability); at most 1 in-flight unacknowledged action may be lost if failure occurs before acknowledgment.
+**NFR-005**: Scalability: Baseline 500 concurrent active sessions per node; stretch 1500 via horizontal room sharding.
+**NFR-006**: Security: No unauthorized cross-user state access. Initial threat surface: token forgery, replay, sequence spoofing, stale reconnect token reuse. Detailed threat model deferred.
+**NFR-007**: Privacy: Logs contain only opaque user_id, hashed session_id, action type enums, truncated error details; no raw tokens or IP addresses.
+**NFR-008**: Observability: Alert if reconnect_success_total / reconnect_attempts_total < 0.98 (5m) OR version_reject_total / connect_attempts_total > 0.05 (15m) OR action_latency_ms p95 > 200ms for 3 consecutive windows.
 
 ### Open Questions / Clarifications Needed
-1. Reconnect retry policy (intervals, total duration, backoff strategy).
-2. Rollback semantics for multi-step atomic actions.
-3. Outage messaging style & localization needs.
-4. Authorization roles (are there admins, spectators, moderators?).
-5. Log retention duration & compliance constraints.
-6. Required metrics list & SLIs / SLOs.
-7. Scalability targets (concurrent users baseline & stretch).
-8. Inactivity timeout duration.
-9. Data privacy / PII boundaries for events.
-10. Consistency requirement for reconnect (last-write-wins vs. vector ordering?).
+1. Detailed threat model expansion (vector enumeration & mitigations)
+2. Availability escalation policy (incident response thresholds)
+3. Cache eviction & adaptive coalescing tuning parameters
+4. Localization / i18n strategy for user-facing status banners (future scope)
+
+All prior clarification markers have been resolved and incorporated above.
 
 ### Assumptions (Subject to validation)
 - Existing character creation & login flow already implemented in earlier features.
