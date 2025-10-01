@@ -88,7 +88,7 @@ As a returning player, I open the web client, successfully authenticate, see a l
 - **FR-007**: While connected, the user MUST be able to submit textual chat messages associated with the active character.
 - **FR-008**: System MUST deliver each submitted chat message to all other currently connected players on the same server instance (excluding or including sender echo [NEEDS CLARIFICATION: should sender see their own message as delivered entry?]).
 - **FR-009**: Chat messages MUST appear to all recipients in a consistent, deterministic order (defined ordering rule: ascending accepted timestamp). [NEEDS CLARIFICATION: tie-break rule if two messages share same acceptance time]
-- **FR-010**: System MUST enforce a maximum message length and reject messages exceeding it with a user-visible error. [NEEDS CLARIFICATION: numeric maximum]
+- **FR-010**: System MUST enforce a maximum chat message length of 256 characters (Unicode code points) and reject any longer submission with a user-visible validation error.
 - **FR-011**: System MUST enforce a reasonable rate limit on message submissions to mitigate spam. [NEEDS CLARIFICATION: threshold + time window]
 - **FR-012**: System MUST prevent sending chat messages before the server session is confirmed established.
 - **FR-013**: System MUST remove a user's presence from the server instance promptly upon logout, browser close (within a grace period), or connectivity timeout. [NEEDS CLARIFICATION: grace period duration]
@@ -119,19 +119,18 @@ As a returning player, I open the web client, successfully authenticate, see a l
 - Reliability targets (uptime, latency) not specified and need definition for test acceptance. [NEEDS CLARIFICATION]
 
 ### Open Questions (Consolidated)
-1. What is the maximum chat message length?
-2. What are the chat rate limit thresholds (messages per time window)?
-3. Are offensive content filtering or moderation requirements in scope?
-4. Should the sender see their own chat message echoed in the feed?
-5. Tie-break rule for identical timestamps (e.g., sequence counter vs. insertion order)?
-6. Numeric capacity limit per server instance? (Single instance still needs a limit.)
-7. Reconnection grace period for transient disconnects?
-8. Multi-tab / multi-character concurrent session policy?
-9. Required visibility for other players (names vs. count only)?
-10. Join failure reason taxonomy to standardize user messaging?
-11. Logging retention and access expectations?
-12. Character switching policy after connection (explicit leave only?).
-13. Sanitization scope (which characters or formats are disallowed)?
+1. What are the chat rate limit thresholds (messages per time window)?
+2. Are offensive content filtering or moderation requirements in scope?
+3. Should the sender see their own chat message echoed in the feed?
+4. Tie-break rule for identical timestamps (e.g., sequence counter vs. insertion order)?
+5. Numeric capacity limit per server instance? (Single instance still needs a limit.)
+6. Reconnection grace period for transient disconnects?
+7. Multi-tab / multi-character concurrent session policy?
+8. Required visibility for other players (names vs. count only)?
+9. Join failure reason taxonomy to standardize user messaging?
+10. Logging retention and access expectations?
+11. Character switching policy after connection (explicit leave only?).
+12. Sanitization scope (which characters or formats are disallowed)?
 
 ### Key Entities *(include if feature involves data)*
 - **User**: Represents an authenticated account; attributes: unique identifier, associated characters. (Credentials / auth details out of scope.)
@@ -182,5 +181,6 @@ As a returning player, I open the web client, successfully authenticate, see a l
 - Q: How is the server instance selected for a user when they click Connect? → A: Single global shared instance (no selection UI)
 - Q: Will multiple server instances be supported now or only later? → A: Single instance now; future multi-instance expansion planned (design must not preclude)
 - Q: Should users see any prior chat history immediately upon joining the server? → A: No history (only messages after join)
+- Q: What is the maximum chat message length (in characters) to enforce? → A: 256
 
 ---
