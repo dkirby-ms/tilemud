@@ -67,14 +67,14 @@ As a returning player, I open the web client, successfully authenticate, see a l
 ### Edge Cases
 - Character list empty: authenticated user sees an empty roster state with a clear call-to-action that navigates them into the existing character creation flow; joining a server is blocked until at least one character exists.
 - Multiple simultaneous browser tabs using different characters (policy [NEEDS CLARIFICATION: allow concurrent sessions per account?]).
-- Rapid message sending approaching rate limits (expected handling [NEEDS CLARIFICATION: throttle vs. reject?]).
+- Rapid message sending approaching rate limits (excess after 5 messages within 5s sliding window rejected with user-visible error).
 - Oversized chat message exceeding maximum permitted length (expected result: rejection with user-facing error — max length value [NEEDS CLARIFICATION]).
-- Server instance at capacity when attempting to connect (capacity handling [NEEDS CLARIFICATION: queue, alternate instance, or error?]).
-- Network drop mid-session (rejoin window duration [NEEDS CLARIFICATION]).
+- Server instance at capacity when attempting to connect: Out of scope for this feature (no enforced numeric cap; joins proceed while server operational).
+- Network drop mid-session (session presence retained up to 15s grace; reconnect within window resumes seamlessly, else presence removed).
 - Attempt to send message before server session fully established (should be blocked with clear status message).
 - Duplicate character selection submission (idempotent handling required; only one session established).
-- Offensive or disallowed content (moderation expectation [NEEDS CLARIFICATION: filter, report, or none in scope?]).
-- Time skew or ordering issues for chat messages (ordering rule: chronological by accepted timestamp — conflict resolution [NEEDS CLARIFICATION]).
+- Offensive or disallowed content: advanced moderation out of scope; baseline sanitization only (no banned-word filtering).
+ - Time skew or ordering issues for chat messages (ordering rule: chronological by accepted timestamp; tie-break = original server receive queue order).
 
 ## Requirements *(mandatory)*
 
@@ -86,16 +86,16 @@ As a returning player, I open the web client, successfully authenticate, see a l
 - **FR-005**: System MUST ensure a user cannot simultaneously join the same server instance with the same character more than once (idempotent join / duplicate prevention).
 - **FR-006**: System MUST provide clear feedback of connection state transitions: (a) connecting, (b) connected, (c) disconnected, (d) reconnecting (if supported). [NEEDS CLARIFICATION: is automatic reconnection in scope?]
 - **FR-007**: While connected, the user MUST be able to submit textual chat messages associated with the active character.
-- **FR-008**: System MUST deliver each submitted chat message to all other currently connected players on the same server instance (excluding or including sender echo [NEEDS CLARIFICATION: should sender see their own message as delivered entry?]).
-- **FR-009**: Chat messages MUST appear to all recipients in a consistent, deterministic order (defined ordering rule: ascending accepted timestamp). [NEEDS CLARIFICATION: tie-break rule if two messages share same acceptance time]
+- **FR-008**: System MUST deliver each submitted chat message to all currently connected players on the same server instance AND include the sender's own message in the feed only after server acceptance (no speculative/optimistic local echo prior to acceptance).
+- **FR-009**: Chat messages MUST appear to all recipients in a consistent, deterministic order: primary sort ascending by accepted timestamp; if two messages share the same accepted timestamp, the server's original receive queue order is used as a tie-break.
 - **FR-010**: System MUST enforce a maximum chat message length of 256 characters (Unicode code points) and reject any longer submission with a user-visible validation error.
-- **FR-011**: System MUST enforce a reasonable rate limit on message submissions to mitigate spam. [NEEDS CLARIFICATION: threshold + time window]
+- **FR-011**: System MUST enforce a rate limit of 5 messages per 5-second sliding window per user per server instance; submissions exceeding the limit are rejected with a user-visible error message and not queued.
 - **FR-012**: System MUST prevent sending chat messages before the server session is confirmed established.
-- **FR-013**: System MUST remove a user's presence from the server instance promptly upon logout, browser close (within a grace period), or connectivity timeout. [NEEDS CLARIFICATION: grace period duration]
+- **FR-013**: System MUST remove a user's presence from the server instance promptly upon logout, browser close, or connectivity timeout, applying a 15-second reconnection grace period for transient disconnects (presence retained and chat blocked during grace; after 15s without reconnection presence is removed).
 - **FR-014**: System MUST NOT expose characters belonging to other users in the selection list.
 - **FR-015**: System MUST restrict chat visibility so only players in the same server instance receive the messages (no cross-instance leakage).
 -- **FR-015**: System MUST restrict chat visibility so only players in the same server instance receive the messages (no cross-instance leakage). (Superseded conceptually by FR-028 while only one global instance exists; retained for future multi-instance evolution.)
-- **FR-016**: System MUST clearly communicate any failure to join (e.g., capacity reached) with a user-understandable reason. [NEEDS CLARIFICATION: list of possible join failure reasons in scope]
+- **FR-016**: System MUST clearly communicate any failure to join (e.g., authentication expired, server unavailable) with a user-understandable reason. [NEEDS CLARIFICATION: list of possible join failure reasons in scope]
 - **FR-017**: System MUST, when the authenticated user has zero characters, present an empty-state UI and redirect (via action/CTA) into the existing character creation flow; server connection remains disabled until a character is created.
 - **FR-018**: System MUST ensure that disconnect events (intentional or unintentional) stop further chat reception and sending until reconnection.
 - **FR-019**: System MUST log session start and end events for audit / operational insight. [NEEDS CLARIFICATION: required retention / visibility of logs]
@@ -108,29 +108,16 @@ As a returning player, I open the web client, successfully authenticate, see a l
  - **FR-028**: System MUST connect all users to a single global shared server instance (no manual selection UI) when they click Connect; multi-instance discovery / routing is explicitly out of scope for this feature but the design MUST NOT preclude adding multiple instances later.
 
 *Ambiguity Examples (retained intentionally for clarification):*
-- **FR-026**: System MUST moderate or filter disallowed language. [NEEDS CLARIFICATION: scope and enforcement approach] (If out of scope, remove.)
-- **FR-027**: System MUST define maximum simultaneous players per server instance. [NEEDS CLARIFICATION: numeric capacity]
-
-### Assumptions & Dependencies (Optional)
-- Existing character creation functionality already exists outside this feature scope and is reused (no duplicate inline creation form here).
-- Only one globally shared server instance is active for this feature scope; horizontal sharding / regional routing is out of scope (future expansion anticipated but deferred).
-- There is at least one running server instance available for connections. [NEEDS CLARIFICATION: is server instance selection user-driven or automatic?]
-- Persistent storage of characters and user accounts exists. [NEEDS CLARIFICATION: any constraints on freshness or caching?]
-- Reliability targets (uptime, latency) not specified and need definition for test acceptance. [NEEDS CLARIFICATION]
+- ~~FR-026: System MUST moderate or filter disallowed language.~~ (Removed: advanced moderation out of scope; baseline sanitization only.)
+- ~~FR-027: System MUST define maximum simultaneous players per server instance.~~ (Removed: explicit numeric capacity management out of scope; implicit process limits only.)
 
 ### Open Questions (Consolidated)
-1. What are the chat rate limit thresholds (messages per time window)?
-2. Are offensive content filtering or moderation requirements in scope?
-3. Should the sender see their own chat message echoed in the feed?
-4. Tie-break rule for identical timestamps (e.g., sequence counter vs. insertion order)?
-5. Numeric capacity limit per server instance? (Single instance still needs a limit.)
-6. Reconnection grace period for transient disconnects?
-7. Multi-tab / multi-character concurrent session policy?
-8. Required visibility for other players (names vs. count only)?
-9. Join failure reason taxonomy to standardize user messaging?
-10. Logging retention and access expectations?
-11. Character switching policy after connection (explicit leave only?).
-12. Sanitization scope (which characters or formats are disallowed)?
+1. Multi-tab / multi-character concurrent session policy?
+2. Required visibility for other players (names vs. count only)?
+3. Join failure reason taxonomy to standardize user messaging?
+4. Logging retention and access expectations?
+5. Character switching policy after connection (explicit leave only?).
+6. Sanitization scope (which characters or formats are disallowed)?
 
 ### Key Entities *(include if feature involves data)*
 - **User**: Represents an authenticated account; attributes: unique identifier, associated characters. (Credentials / auth details out of scope.)
@@ -182,5 +169,11 @@ As a returning player, I open the web client, successfully authenticate, see a l
 - Q: Will multiple server instances be supported now or only later? → A: Single instance now; future multi-instance expansion planned (design must not preclude)
 - Q: Should users see any prior chat history immediately upon joining the server? → A: No history (only messages after join)
 - Q: What is the maximum chat message length (in characters) to enforce? → A: 256
+- Q: What are the chat rate limit thresholds (messages per time window) and how to handle excess? → A: 5 messages / 5s sliding window; excess rejected with visible error
+- Q: Should the sender see their own chat message echoed in the feed? → A: Yes, only after server acceptance (no optimistic local echo)
+- Q: Tie-break rule for identical accepted timestamps? → A: Use original server receive queue order as deterministic tie-break
+- Q: Numeric capacity limit per single global server instance? → A: No fixed limit in this feature (capacity management out of scope)
+ - Q: Are offensive content filtering / moderation requirements in scope for chat? → A: Out of scope; only baseline sanitization (no banned-word filtering)
+ - Q: Reconnection grace period for transient disconnects? → A: 15s grace; presence retained, removed after timeout
 
 ---

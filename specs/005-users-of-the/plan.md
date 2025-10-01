@@ -1,8 +1,8 @@
 
-# Implementation Plan: Web Client Login, Character Selection, Server Connection & In-Game Chat
+# Implementation Plan: Web Client Login, Character Selection, Server Connection & In-Game Chat Integration
 
-**Branch**: `005-users-of-the` | **Date**: 2025-10-01 | **Spec**: `/specs/005-users-of-the/spec.md`
-**Input**: Feature specification from `specs/005-users-of-the/spec.md`
+**Branch**: `005-users-of-the` | **Date**: 2025-10-01 | **Spec**: `/home/saitcho/tilemud/specs/005-users-of-the/spec.md`
+**Input**: Feature specification from `/specs/005-users-of-the/spec.md`
 
 ## Execution Flow (/plan command scope)
 ```
@@ -31,30 +31,28 @@
 - Phase 3-4: Implementation execution (manual or via tools)
 
 ## Summary
-Enable authenticated players (Entra ID) using the existing web client to (1) view and select a previously created character (reusing feature 001), (2) explicitly click Connect to join the single global Colyseus game room / server instance, and (3) exchange real‑time chat messages limited to messages occurring after their join (no backlog) with a 256 character maximum length. This plan integrates existing character roster & selection UI flows with the server’s Colyseus `BattleRoom` (or a lighter-weight chat/session room adapter if required) while preserving thin-client, server-authoritative principles. Future multi-instance routing is out-of-scope but design must not block scaling.
+Enable authenticated web client users (Entra ID) to: (1) view & select an existing character, (2) connect to the single global Colyseus server instance using that character, and (3) participate in real-time chat with other connected players under clarified constraints (256 char max, 5 msgs / 5s rate limit, ordered by timestamp + receive order tie-break, sender echo after server acceptance, 15s reconnection grace). Moderation beyond baseline sanitization and explicit capacity limits are out of scope for this feature, but design must not preclude future multi-instance / moderation extensions.
 
 ## Technical Context
-**Language/Version**: TypeScript 5.x (frontend Vite + backend Node 20)  
-**Primary Dependencies**: Frontend: React 19, Zustand, MSAL (`@azure/msal-browser`); Backend: Express 5, Colyseus 0.16, @colyseus/schema, zod, pg, redis, pino  
-**Storage**: PostgreSQL (persistent characters & outcomes), Redis (rate limits / ephemeral), In-memory Colyseus room state  
-**Testing**: Vitest (unit, integration, contract) on both server and web-client, MSW for frontend API mocking  
-**Target Platform**: Browser (modern evergreen) + Node.js 20 LTS server  
-**Project Type**: Web application (frontend + backend already separated as `web-client/` and `server/`)  
-**Performance Goals**: Join & roster load < 2s (aligned with feature 001), chat send→display latency target < 300ms p95 (initial heuristic), reconnect grace period (existing server default 60s) leveraged  
-**Constraints**: Thin client (no authoritative state), single global instance, message length ≤ 256 chars, no historical backlog, colyseus message ordering preserved  
-**Scale/Scope**: Initial single-room concurrency matching `BattleRoom` maxPlayers (still TBD numeric capacity); future multi-instance scaling deferred
+**Language/Version**: TypeScript 5.x (Node 20 backend, React/Vite frontend)  
+**Primary Dependencies**: Backend: Colyseus 0.16, Express 5, zod, pg, redis, pino. Frontend: React 19, Vite 7, Zustand, MSAL Browser, react-router-dom.  
+**Storage**: PostgreSQL (characters, sessions/audit), Redis (rate limiting / reconnect sessions), in-memory Colyseus room state.  
+**Testing**: Vitest (unit/contract/integration) both server and web-client; MSW for client-side contract tests; supertest for API endpoints (existing).  
+**Target Platform**: Browser (desktop-first, future mobile), server on Linux container (Docker).  
+**Project Type**: Web (frontend + backend monorepo style: `web-client/` + `server/`).  
+**Performance Goals**: Tentative (to refine later): Chat end-to-end latency < 300ms p95 under nominal load (<100 concurrent).  
+**Constraints**: Single global instance; no message backlog; deterministic ordering; 15s reconnect grace; rate limit enforcement strict (reject).  
+**Scale/Scope**: Initial cohort (<100 concurrent). No horizontal scaling in this feature; design shall not block sharding later.
 
 ## Constitution Check
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-Constitution (Web Client) Principles Mapping:
-- Thin Client / Server-Authoritative: Chat + join flows send intents; no local authoritative simulation added → PASS.
-- Real-time First: Use existing Colyseus websocket channel; avoid polling for chat → PASS.
-- Efficiency / Budgets: Adds minimal incremental bundle code (Colyseus client library already dependency via existing plan? If not, will add and monitor bundle size) → WATCH (track bundle delta in quickstart).
-- Type-Safe & Testable: Plan introduces contract tests for join & chat message envelope; unit tests for message store & rate-limit UI feedback → PASS.
-- Diagnostics: Reuse existing latency / reconnect indicators or add minimal extension (connection state label) → PASS.
-
-Initial Constitution Check: PASS (No violations). No complexity deviations needed at this stage.
+Constitution (web client) principles vs plan:
+- Thin client / server authoritative: ✔ Chat send = intent; server acceptance determines echo. No local optimistic echo beyond loading state.
+- Real-time efficient: ✔ Will use existing Colyseus connection (add chat channel/messages). Will avoid redundant polling; reuse WebSocket.
+- Type-safe & testable: ✔ Will define shared message types (zod schemas or Colyseus schema extension) and contract tests.
+- Diagnostics: Will add minimal connection state indicator + rate limit error surface; full FPS/network overlay not expanded in this feature (already partially present via diagnostics overlay capability). No violation.
+No violations detected requiring complexity justification at this stage.
 
 ## Project Structure
 
@@ -69,39 +67,41 @@ specs/[###-feature]/
 └── tasks.md             # Phase 2 output (/tasks command - NOT created by /plan)
 ```
 
-ios/ or android/
 ### Source Code (repository root)
+<!--
+  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
+  for this feature. Delete unused options and expand the chosen structure with
+  real paths (e.g., apps/admin, packages/something). The delivered plan must
+  not include Option labels.
+-->
 ```
 server/
    src/
-      api/              # Existing HTTP endpoints (health, outcomes, etc.)
-      rooms/            # Colyseus rooms (BattleRoom etc.)
-      services/         # Domain services (rateLimiter, messageService ...)
-      state/            # Colyseus state schema definitions
-      infra/            # Config, container, env bootstrap
-      actions/          # Action parsing & validation
+      api/               # Existing REST endpoints (extend if needed for roster)
+      rooms/             # Colyseus BattleRoom (add chat handling integration)
+      services/          # Add ChatMessageService extension if needed
+      models/            # (ReconnectSession, add ChatMessage model if persisted ephemeral log?)
+      actions/           # Player action handling (may integrate chat action)
    tests/
-      unit/
-      integration/
       contract/
+      integration/
+      unit/
 
 web-client/
    src/
       features/
-         character/      # Existing character roster & creation
-         session/        # (NEW) connection orchestration & state
-         chat/           # (NEW) chat panel, message list, input box, validation
-      providers/        # Auth / MSAL provider
-      hooks/            # Shared hooks
-      types/            # Domain & API typings
-      utils/            # Helpers (e.g., formatting, error mapping)
+         character/       # Existing character selection
+         chat/            # NEW: chat UI (message list, input, rate limit feedback)
+         session/         # NEW: connection state hook & Colyseus client wrapper
+      providers/
+      app/
    tests/
+      contract/          # Add chat contract tests (API message shape / WebSocket)
+      integration/       # End-to-end simulated user flows
       unit/
-      integration/
-      contract/
 ```
 
-**Structure Decision**: Web application dual-project; adding `session` and `chat` feature subdirectories under `web-client/src/features/`. No server structure changes required initially—chat piggybacks on existing room messaging or (if absent) will add minimal broadcast channel. Contracts added via server HTTP (join handshake) + Colyseus message schemas.
+**Structure Decision**: Extend existing dual project layout; introduce `chat/` and `session/` feature modules on the client; augment server room + possible dedicated service for chat validation & rate limiting.
 
 ## Phase 0: Outline & Research
 1. **Extract unknowns from Technical Context** above:
@@ -122,15 +122,14 @@ web-client/
    - Rationale: [why chosen]
    - Alternatives considered: [what else evaluated]
 
-**Output**: research.md with all NEEDS CLARIFICATION resolved
+**Initial Research Focus Areas**:
+- Multi-tab/concurrent session policy patterns (decide if restricted to 1 active connection per user per character – likely reject secondary joins with explanatory error).
+- Visibility indicator: count vs names (choose minimal viable: count + optional expansion, TBD in tasks phase if not clarified beforehand).
+- Logging retention baseline (session start/end events already required; decide retention strategy: rely on pino + central log ingestion—document).
+- Sanitization scope (baseline: strip control chars, enforce Unicode normalization NFC, reject >256).
+- Join failure taxonomy draft (auth expired, server unavailable, rate limited, invalid character selection, duplicate session) pending full enumeration.
 
-Planned Research Focus Areas:
-1. Colyseus client best practice for lightweight chat-only messaging vs. action pipeline – confirm reuse or introduce dedicated channel.
-2. Message ordering guarantees and tie-break (likely server acceptance tick or monotonic sequence).
-3. Rate limiting interplay (UI feedback) using existing server rateLimiter service events (currently for actions)—extend or create chat-specific limiter.
-4. Graceful handling of reconnect (reuse existing reconnectService grace period of 60s).
-5. Bundle impact of adding Colyseus client to web-client (if not already present) and mitigation (code splitting?).
-6. Security review: Ensure auth token is not directly trusted by the Colyseus handshake (server side validation path).
+**Output**: research.md with rationale & decisions; if unresolved items remain but non-blocking, mark Deferred.
 
 ## Phase 1: Design & Contracts
 *Prerequisites: research.md complete*
@@ -140,19 +139,26 @@ Planned Research Focus Areas:
    - Validation rules from requirements
    - State transitions if applicable
 
-2. **Generate API contracts** from functional requirements:
-   - For each user action → endpoint
-   - Use standard REST/GraphQL patterns
-   - Output OpenAPI/GraphQL schema to `/contracts/`
+2. **Generate API & Realtime Contracts**:
+   - REST (if needed): Character roster already exists; add /chat/health (optional) only if necessary (likely skip).
+   - WebSocket (Colyseus room messages): Define message schemas:
+     * client→server: `chat.send { message: string, clientNonce: string }`
+     * server→clients: `chat.message { id, characterId, content, acceptedTs, order }`
+     * server→client (errors): `chat.reject { clientNonce, reason, code }`
+     * presence update: `presence.snapshot { count, players? }` if names chosen later.
+   - Rate limit error mapping (code: `RATE_LIMIT_EXCEEDED`).
 
-3. **Generate contract tests** from contracts:
-   - One test file per endpoint
-   - Assert request/response schemas
-   - Tests must fail (no implementation yet)
+3. **Generate contract tests**:
+   - Web-client: MSW or mocked Colyseus client tests validating message handling & ordering.
+   - Server: Unit tests for rate limiting (5/5s), ordering tie-break, reconnection within 15s vs after.
+   - Error scenarios: oversize message, pre-session send attempt, duplicate session join.
 
-4. **Extract test scenarios** from user stories:
-   - Each story → integration test scenario
-   - Quickstart test = story validation steps
+4. **Extract test scenarios**:
+   - Story 1: Auth → Select → Connect → Send message visible to others (assert echo timing after acceptance)
+   - Story 2: Multiple characters selection isolation
+   - Story 3: Rate limit rejection path
+   - Story 4: Late join message visibility (no history)
+   - Story 5: Disconnect + reconnect within 15s (presence retained vs after 15s removal)
 
 5. **Update agent file incrementally** (O(1) operation):
    - Run `.specify/scripts/bash/update-agent-context.sh copilot`
@@ -164,14 +170,6 @@ Planned Research Focus Areas:
    - Output to repository root
 
 **Output**: data-model.md, /contracts/*, failing tests, quickstart.md, agent-specific file
-
-Design Elements to Produce:
-- Data Model additions: Client-side ephemeral stores: SessionState { status: idle|connecting|connected|error, playerId, characterId, instanceId }, ChatMessage { id, fromCharacterId, content, receivedAt }. No persistence added.
-- Contracts: (a) HTTP: none new (assuming existing roster + selection endpoints); (b) WebSocket: Colyseus room join message shape (options: { playerId, displayName }); broadcast message: `chat.message` { id, from, content, ts }. Rejection / validation error message.
-- Validation: Enforce ≤256 chars client-side before send; block empty/whitespace-only; rate limit UI disabled state (server still authoritative).
-- Quickstart: Steps: login, ensure character, open Connect pane, join, send message, observe echo + others.
-- Tests: Contract tests generate failing expectations for message envelope, ordering (monotonic timestamp), rejection on >256 chars.
-- Agent context update: record addition of Colyseus client usage in web-client for chat & session.
 
 ## Phase 2: Task Planning Approach
 *This section describes what the /tasks command will do - DO NOT execute during /plan*
@@ -189,7 +187,7 @@ Design Elements to Produce:
 - Dependency order: Models before services before UI
 - Mark [P] for parallel execution (independent files)
 
-**Estimated Output**: 25-30 numbered, ordered tasks in tasks.md
+**Estimated Output**: ~30 tasks (models, services, client state, UI, tests, logging, docs)
 
 **IMPORTANT**: This phase is executed by the /tasks command, NOT by /plan
 
@@ -201,25 +199,25 @@ Design Elements to Produce:
 **Phase 5**: Validation (run tests, execute quickstart.md, performance validation)
 
 ## Complexity Tracking
-No deviations; complexity remains within existing dual-project structure. (Table intentionally omitted.)
+No constitutional violations identified. No additional complexity justifications required.
 
 
 ## Progress Tracking
 *This checklist is updated during execution flow*
 
 **Phase Status**:
-- [x] Phase 0: Research complete (/plan command)  
-- [x] Phase 1: Design complete (/plan command)  
-- [x] Phase 2: Task planning approach documented (/plan command)  
-- [ ] Phase 3: Tasks generated (/tasks command)  
-- [ ] Phase 4: Implementation complete  
-- [ ] Phase 5: Validation passed  
+- [ ] Phase 0: Research complete (/plan command)
+- [ ] Phase 1: Design complete (/plan command)
+- [ ] Phase 2: Task planning complete (/plan command - describe approach only)
+- [ ] Phase 3: Tasks generated (/tasks command)
+- [ ] Phase 4: Implementation complete
+- [ ] Phase 5: Validation passed
 
 **Gate Status**:
-- [x] Initial Constitution Check: PASS  
-- [x] Post-Design Constitution Check: PASS  
-- [ ] All NEEDS CLARIFICATION resolved (Remaining: rate limit thresholds, capacity numeric limit, moderation scope, echo behavior, tie-break rule, reconnection grace window specifics, visibility format, failure reason taxonomy, logging retention, sanitization specifics)  
-- [x] Complexity deviations documented (none required)  
+- [ ] Initial Constitution Check: PASS
+- [ ] Post-Design Constitution Check: PASS
+- [ ] All NEEDS CLARIFICATION resolved
+- [ ] Complexity deviations documented
 
 ---
 *Based on Constitution v2.1.1 - See `/memory/constitution.md`*
