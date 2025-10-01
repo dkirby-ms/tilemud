@@ -1,124 +1,144 @@
-# Tasks: Integrate Server, Web Client, and Backing Data Layers
+# Task List: Integrate Server, Web Client, and Backing Data Layers
 
-Legend: [P] = Can be executed in parallel (low coupling)  
-Ordering: Follows dependency chain (foundations → contracts → server core → client integration → observability → validation)
+Legend: [P] = Parallelizable (no shared file contention); Dependencies listed by T###.
 
-## 0. Governance & Preparation
-1. Confirm feature spec + research decisions are frozen (availability % & threat model depth deferred explicitly)  
-2. Create branch sync checklist (ensure `005-integrate-the-server` up to date with `main`) [P]
+## TDD & Dependency Philosophy
+- Tests precede implementation for contracts, sequencing, and resilience.
+- Persistence primitives precede real-time handlers.
+- Real-time handlers precede client UX wiring.
+- Observability wired early to surface performance regressions.
 
-## 1. Contract & Schema Definition
-3. Define REST contract schemas (session bootstrap, health, version) in `/specs/005-integrate-the-server/contracts/` + `server/src/contracts` [P]
-4. Define real-time message schemas (intent.move, intent.chat, intent.action, event.state_delta, event.ack, event.error, event.degraded, event.version_mismatch) [P]
-5. Add zod validation modules (size limits, required fields, enums) [P]
-6. Implement script or npm task to generate shared TypeScript types for client consumption (copy or publish via local path alias) [P]
-7. Add negative/invalid schema test vectors (oversized payload, invalid enum, missing field) [P]
+## Setup & Governance
+T001 Confirm spec/research frozen; document deferred availability SLO & threat model in research.md (no code).  
+T002 Sync branch `005-integrate-the-server` with latest `main` (fast-forward or merge) [P].  
 
-## 2. Persistence & Data Model Foundations
-8. Create `ActionEvent` persistence module (insert + ordered read by sequence)  
-9. Implement per-action durability wrapper (transaction commit before ack)  
-10. Add sequence number allocator + idempotency guard (reject duplicates / gaps)  
-11. Implement CharacterProfile read/update functions (position, inventory, stats) [P]
-12. Add migration scripts if any new tables/indices required (ActionEvent indices)  
-13. Implement inactivity timeout scheduler (10m idle termination)  
+## Contracts & Validation (Server)
+T003 Create REST contract schemas (bootstrap, health, version) in `specs/005-integrate-the-server/contracts/rest.ts` + mirror zod types in `server/src/contracts/rest.ts` [P].  
+T004 Create real-time message schemas (intent.move/chat/action; event.state_delta/ack/error/degraded/version_mismatch) in `specs/.../contracts/realtime.ts` + `server/src/contracts/realtime.ts` (REUSE existing `actionRequestSchema` from `server/src/actions/actionRequest.ts` – do not redefine action variants) [P].  
+T004A Consolidate rate limiting: adopt `RateLimiterService` as canonical, add channel mapping + adapter `server/src/services/rateLimitsAdapter.ts`, deprecate `GameRateLimits` usage (leave shim if still referenced) [P].  
+T005 Add shared validation utilities (sequence guard, size limits) `server/src/contracts/validation.ts` [P].  
+T006 Implement type generation script (e.g. `server/scripts/generate-shared-types.ts`) exporting to `web-client/src/types/generated/` [P].  
+T007 Negative schema test vectors (invalid enums, oversize payload) in `server/tests/contract/invalidSchemas.test.ts` [P].  
 
-## 3. Session & Version Management
-14. Implement external OAuth2/SSO token validation adapter (stub or real)  
-15. Implement session bootstrap endpoint `/api/session/bootstrap` (token validate, version check, initial state composition)  
-16. Implement version endpoint `/api/version` returning build identifier [P]
-17. Enforce strict lockstep version check; reject mismatches with structured error code VERSION_MISMATCH  
-18. Implement health endpoint `/api/health` returning readiness + dependency degradation flags (db, cache)  
-19. Add reconnect token issuance & validation (tie to last sequence)  
-20. Implement reconnect delta vs snapshot logic (determine missing sequences; send diff or full)  
+## Persistence & Data Model
+T008 Implement ActionEvent model + repository `server/src/models/actionEvent.ts` (insert, fetchBySequenceRange).  
+T009 Implement per-action durability wrapper `server/src/services/durability.ts` (transaction + ack gating).  
+T010 Implement sequence allocator & idempotency guard `server/src/services/sequencer.ts` (reject duplicates/gaps).  
+T011 Implement CharacterProfile accessors `server/src/models/characterProfile.ts` (get/update position/inventory/stats) [P].  
+T012 Add migration for ActionEvent + indices `infrastructure/migrations/003_action_event.sql`.  
+T013 Implement inactivity timeout scheduler `server/src/services/sessionTimeout.ts` (10m idle) [P].  
 
-## 4. Real-time Room Logic
-21. Extend room join handshake to include: version, token, initial sequence number  
-22. Implement intent handlers (move, chat, generic action) with validation + sequencing  
-23. Implement state delta broadcaster honoring 100ms freshness window (coalesce under burst)  
-24. Implement degraded mode toggling when Redis unavailable (emit event.degraded)  
-25. Enforce movement/chat rate limits (movement ≤20/sec, chat ≤5/sec)  
-26. Implement action ack emission only after durable persistence success  
-27. Implement server restart recovery test hook (simulate restart, verify no acknowledged loss)  
+## Session & Version Management
+T014 Implement external token validation adapter `server/src/services/auth/tokenValidator.ts` (stub verifying signature / claims).  
+T015 Implement `/api/session/bootstrap` handler `server/src/api/sessionBootstrap.ts` (validate token, version, return state).  
+T016 Implement `/api/version` handler `server/src/api/version.ts` [P].  
+T017 Enforce version lockstep inside handshake + REST (shared util) `server/src/services/versionCheck.ts`.  
+T018 Implement `/api/health` reporting readiness + degraded flags `server/src/api/health.ts`.  
+T019 Reconnect token issuance & validation `server/src/services/reconnect.ts`.  
+T020 Reconnect delta vs snapshot logic `server/src/services/reconnectSync.ts`.  
 
-## 5. Cache & Freshness Layer
-28. Implement Redis presence/cache wrapper (namespacing, TTL)  [P]
-29. Add freshness checker (invalidate >100ms stale critical fields)  [P]
-30. Implement fallback path when cache down (force DB read, mark degraded)  
+## Real-time Room Logic
+T021 Extend room join handshake `server/src/rooms/gameRoom.ts` (include version, token, initial sequence).  
+T022 Implement intent handlers (move/chat/action) `server/src/rooms/intentHandlers.ts`.  
+T023 Implement state delta broadcaster (100ms coalescing) `server/src/rooms/stateBroadcaster.ts`.  
+T024 Implement degraded mode trigger from Redis outage `server/src/services/cacheStatus.ts`.  
+T025 Enforce rate limits movement≤20/s, chat≤5/s using consolidated adapter (post T004A) `server/src/services/rateLimitsAdapter.ts`.  
+T026 Emit ack only after durability success (integrate durability wrapper) modify `server/src/rooms/intentHandlers.ts`.  
+T027 Server restart recovery test hook `server/scripts/testRestartRecovery.ts`.  
 
-## 6. Observability & Logging
-31. Instrument metrics (counters, histogram, gauges) per research list  
-32. Add structured logging (pino) for session lifecycle (connect, reconnect, terminate, degraded, version reject)  
-33. Ensure privacy filter: redact tokens, hash user_id if needed  
-34. Add latency p95 export via histogram + aggregator  [P]
-35. Add forced refresh counter instrumentation (staleness triggered)  [P]
+## Cache & Freshness
+T028 Redis cache/presence wrapper `server/src/infra/cache.ts` (namespacing, TTL) [P].  
+T029 Freshness checker `server/src/services/freshness.ts` (invalidate >100ms) [P].  
+T030 Fallback path when cache down (flag + direct DB fetch) modify `server/src/services/cacheFallback.ts`.  
 
-## 7. Client Integration (Web Client)
-36. Add build version constant injection + display (dev overlay)  
-37. Implement token acquisition/injection flow into session bootstrap  
-38. Implement connection state machine (CONNECTING → ACTIVE → RECONNECTING → DEGRADED → UNAVAILABLE / UPDATE_REQUIRED)  
-39. Add reconnection logic w/ exponential backoff + UI countdown  
-40. Implement action dispatch layer (wrap intents with sequence generation on server only; client sends plain intent)  
-41. Implement latency overlay (compute p95 rolling window)  
-42. Implement degraded + update-required user messaging components  
-43. Implement inactivity timeout UX (optional passive notice prior to termination)  [P]
-44. Integrate schema-generated types into client state reducers  [P]
+## Observability & Logging
+T031 Metrics instrumentation `server/src/infra/metrics.ts` (counters, histogram, gauges).  
+T032 Structured logging integration `server/src/infra/logging/sessionLifecycle.ts`.  
+T033 Privacy filter (redact tokens, hash user IDs) `server/src/infra/logging/redaction.ts`.  
+T034 Latency p95 aggregator `server/src/infra/metricsLatency.ts` [P].  
+T035 Forced refresh counter instrumentation integrate in `freshness.ts` [P].  
 
-## 8. Testing (Contracts & Unit)
-45. Create REST contract tests (session bootstrap, version, health) – expect failures before implementation  
-46. Create real-time protocol tests: handshake success, version mismatch rejection, invalid token rejection  
-47. Create sequencing/idempotency tests (duplicate sequence, gap)  
-48. Create rate limit tests (exceed movement/chat thresholds)  
-49. Create per-action durability test (ack only after DB commit)  
-50. Create degraded mode test (simulate Redis outage)  
-51. Create restart recovery test (persist action, restart, reconnect, verify)  
+## Client Integration (Web Client)
+T036 Build/version constant injection `web-client/src/providers/version.ts` + overlay component.  
+T037 Token acquisition/injection service `web-client/src/services/authToken.ts`.  
+T038 Connection state machine `web-client/src/features/session/stateMachine.ts`.  
+T039 Reconnection logic with exponential backoff `web-client/src/features/session/reconnect.ts`.  
+T040 Action dispatch layer `web-client/src/features/actions/dispatcher.ts`.  
+T041 Latency overlay component `web-client/src/components/dev/LatencyOverlay.tsx`.  
+T042 Degraded/update-required messaging components `web-client/src/components/status/ConnectionStatus.tsx`.  
+T043 Inactivity timeout UX notice component `web-client/src/components/status/InactivityNotice.tsx` [P].  
+T044 Integrate generated types into reducers `web-client/src/state/contractsIntegration.ts` [P].  
 
-## 9. Integration & End-to-End
-52. Create reconnect resilience test (drop connection mid-action, ensure no duplicate)  
-53. Create freshness enforcement test (stale cache >100ms triggers refresh)  
-54. Create inactivity timeout test (idle 10m termination)  
-55. Create latency performance test harness (measure action round-trip distribution)  
-56. Create load test scaffolding (simulate 500 concurrent sessions)  
+## Contract & Unit Tests (Write First)
+T045 REST contract tests `server/tests/contract/restContracts.test.ts` (bootstrap/version/health).  
+T046 Real-time protocol tests `server/tests/contract/realtimeProtocol.test.ts`.  
+T047 Sequencing/idempotency tests `server/tests/unit/sequencer.test.ts`.  
+T048 Rate limit tests `server/tests/unit/rateLimiter.test.ts`.  
+T049 Per-action durability test `server/tests/integration/durability.test.ts`.  
+T050 Degraded mode test (Redis outage) `server/tests/integration/degraded.test.ts`.  
+T051 Restart recovery test `server/tests/integration/restartRecovery.test.ts`.  
 
-## 10. Documentation & Developer Experience
-57. Populate contract schema docs (table fields, message shapes)  
-58. Update quickstart with final endpoints + CLI examples  
-59. Add “operational runbook” section (degraded mode, restart recovery)  
-60. Run `.specify/scripts/bash/update-agent-context.sh copilot` to append recent changes  
+## Integration & E2E Tests
+T052 Reconnect resilience test `server/tests/integration/reconnectResilience.test.ts`.  
+T053 Freshness enforcement test `server/tests/integration/freshness.test.ts`.  
+T054 Inactivity timeout test `server/tests/integration/inactivityTimeout.test.ts`.  
+T055 Latency performance test harness `server/tests/perf/latencyHarness.test.ts`.  
+T056 Load test scaffolding script `server/scripts/loadTest.ts`.  
 
-## 11. Quality Gates & Cleanup
-61. Validate all metrics present & names stable (no TODO)  
-62. Lint/typecheck pass (server + web-client)  
-63. All contract + integration tests green  
-64. Performance acceptance: gather p95 stats for initial load & action latency  
-65. Security/privacy pass: log scan confirms no raw tokens / PII  
-66. Final review: remove temporary debug instrumentation  
+## Documentation & DX
+T057 Contract schema docs expansion `specs/005-integrate-the-server/contracts/README.md` (fill field-level details).  
+T058 Update quickstart with final endpoints & metrics section.  
+T059 Operational runbook `specs/005-integrate-the-server/runbook.md` (degraded, restart, latency debugging).  
+T060 Update agent context `.specify/scripts/bash/update-agent-context.sh copilot`.  
 
-## Stretch / Deferred (Not Required for Acceptance)
-67. Availability SLO instrumentation (once global SLO decided)  
-68. Threat model doc (STRIDE table)  
-69. Advanced cache eviction tuning & metrics  
-70. Optional: Web Worker offloading for latency instrumentation calculations  
+## Quality Gates & Finalization
+T061 Metrics presence & naming validation script `server/scripts/validateMetrics.ts`.  
+T062 Lint + typecheck all packages (ensure CI config updated if needed).  
+T063 All contract + integration tests green (tracking meta-task).  
+T064 Performance acceptance capture (record p95 load + action latency) `specs/005-integrate-the-server/perf-results.md`.  
+T065 Security/privacy log scan script `server/scripts/logPrivacyScan.ts`.  
+T066 Remove temporary debug instrumentation (strip dev-only overlays if flagged).  
 
-## Parallelization Notes
-- Contracts (3–7) parallel with data model (8–12) and observability scaffolding (31–35)
-- Client UI tasks (36–44) can start after basic contract types exported (task 6)
-- Real-time sequencing (22–26) depends on persistence (8–11)
+## Stretch / Deferred
+T067 Availability SLO instrumentation & alerting once SLO chosen.  
+T068 Threat model document `specs/005-integrate-the-server/threat-model.md`.  
+T069 Advanced cache eviction tuning experiment doc.  
+T070 Optional: Web Worker latency calc offload `web-client/src/workers/latencyWorker.ts`.  
 
-## Acceptance Exit Criteria Mapping
-| Acceptance Scenario | Tasks Referenced |
-|---------------------|------------------|
-| Initial load ≤3s p95 | 15, 22, 23, 36, 41, 55 |
-| Action latency ≤200ms p95 | 22, 23, 26, 31, 41, 55 |
-| Reconnect w/o loss | 19, 20, 22, 26, 39, 47, 52 |
-| Degraded w/ cache down | 24, 28, 30, 50 |
-| Version mismatch block | 16, 17, 36, 46 |
-| Per-action durability | 8, 9, 26, 49 |
-| Strict freshness 100ms | 23, 29, 53 |
-| No acknowledged loss after restart | 9, 20, 27, 51 |
-| Inactivity timeout | 13, 43, 54 |
+## Parallel Execution Guidance
+- Early Parallel Batch: T002 T003 T004 T004A T005 T006 T007
+- Persistence + Metrics Batch: T008 T011 T013 T028 T029 T034 T035
+- Client UI Batch (post type generation T006): T036 T037 T041 T042 T043 T044
+- Tests always precede dependent impl: e.g., run T045–T051 before marking related implementation done.
 
-## Risk Mitigation Tasks
-- Write amplification: review DB write batching (8–9 combined)  
-- Latency spike risk: instrument early (31, 41)  
-- Over-retry storm: confirm backoff logic test (52)  
+## Dependency Highlights
+- T015 depends on T014, T003, T017
+- T021 depends on T014, T017, T019
+- T022 depends on T010, T011, T021
+- T026 depends on T009 + T022
+- T023 depends on T022 + T029
+- T024 depends on T028
+- T052 depends on T019–T023
+- T025 depends on T004A
+
+## Acceptance Mapping
+| Scenario | Tasks |
+|----------|-------|
+| Initial load ≤3s p95 | T015 T022 T023 T036 T041 T055 |
+| Action latency ≤200ms p95 | T022 T023 T026 T031 T041 T055 |
+| Reconnect w/o loss | T019 T020 T022 T026 T039 T047 T052 |
+| Degraded w/ cache down | T024 T028 T030 T050 |
+| Version mismatch block | T016 T017 T036 T046 |
+| Per-action durability | T008 T009 T026 T049 |
+| Freshness ≤100ms | T023 T029 T053 |
+| No loss after restart | T009 T020 T027 T051 |
+| Inactivity timeout | T013 T043 T054 |
+
+## Risk Mitigation Mapping
+- Write amplification: T009 batching, review after perf harness T055
+- Latency spikes: early metrics T031 + overlay T041
+- Retry storm: T052 validates backoff behavior
+
+## Definition of Done
+All acceptance scenarios pass; performance targets captured in `perf-results.md`; metrics validated (T061); privacy scan passes (T065); no unresolved critical TODOs in codebase.
 
