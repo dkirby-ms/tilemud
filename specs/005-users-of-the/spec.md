@@ -79,7 +79,7 @@ As a returning player, I open the web client, successfully authenticate, see a l
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
-- **FR-001**: System MUST allow a user to authenticate before any character selection or server connection occurs. [NEEDS CLARIFICATION: authentication method / identity provider unspecified]
+- **FR-001**: System MUST allow a user to authenticate via Entra ID External Identities (SSO) before any character selection or server connection occurs.
 - **FR-002**: After successful authentication, system MUST present the user with a list of their available playable characters (if any) containing at minimum each character's name and an unambiguous identifier.
 - **FR-003**: System MUST prevent entering a game server instance until exactly one character is selected.
 - **FR-004**: System MUST establish a player game session bound to the selected character such that all in-session actions and chat messages are attributed only to that character.
@@ -116,24 +116,23 @@ As a returning player, I open the web client, successfully authenticate, see a l
 - Reliability targets (uptime, latency) not specified and need definition for test acceptance. [NEEDS CLARIFICATION]
 
 ### Open Questions (Consolidated)
-1. What authentication mechanism is used (and is logout needed here)?
-2. How is an empty character list handled (create flow included or separate)?
-3. Is server instance selection automatic, or can users choose among multiple instances?
-4. Are users shown prior chat history on join? If yes, how much and in what order?
-5. What is the maximum chat message length?
-6. What are the chat rate limit thresholds (messages per time window)?
-7. Are offensive content filtering or moderation requirements in scope?
-8. Should the sender see their own chat message echoed in the feed?
-9. Tie-break rule for identical timestamps (e.g., sequence counter vs. insertion order)?
-10. Numeric capacity limit per server instance?
-11. Reconnection grace period for transient disconnects?
-12. Multi-tab / multi-character concurrent session policy?
-13. Required backlog (if any) and limit (message count or time span)?
-14. Required visibility for other players (names vs. count only)?
-15. Join failure reason taxonomy to standardize user messaging?
-16. Logging retention and access expectations?
-17. Character switching policy after connection (explicit leave only?).
-18. Sanitization scope (which characters or formats are disallowed)?
+1. How is an empty character list handled (create flow included or separate)?
+2. Is server instance selection automatic, or can users choose among multiple instances?
+3. Are users shown prior chat history on join? If yes, how much and in what order?
+4. What is the maximum chat message length?
+5. What are the chat rate limit thresholds (messages per time window)?
+6. Are offensive content filtering or moderation requirements in scope?
+7. Should the sender see their own chat message echoed in the feed?
+8. Tie-break rule for identical timestamps (e.g., sequence counter vs. insertion order)?
+9. Numeric capacity limit per server instance?
+10. Reconnection grace period for transient disconnects?
+11. Multi-tab / multi-character concurrent session policy?
+12. Required backlog (if any) and limit (message count or time span)?
+13. Required visibility for other players (names vs. count only)?
+14. Join failure reason taxonomy to standardize user messaging?
+15. Logging retention and access expectations?
+16. Character switching policy after connection (explicit leave only?).
+17. Sanitization scope (which characters or formats are disallowed)?
 
 ### Key Entities *(include if feature involves data)*
 - **User**: Represents an authenticated account; attributes: unique identifier, associated characters. (Credentials / auth details out of scope.)
@@ -175,5 +174,10 @@ As a returning player, I open the web client, successfully authenticate, see a l
 - [x] Requirements generated
 - [x] Entities identified
 - [ ] Review checklist passed (pending resolution of [NEEDS CLARIFICATION] items)
+
+## Clarifications
+
+### Session 2025-10-01
+- Q: What authentication approach will this feature use prior to character selection? → A: Entra ID External Identities (SSO)
 
 ---
