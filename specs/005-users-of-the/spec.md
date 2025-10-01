@@ -65,7 +65,7 @@ As a returning player, I open the web client, successfully authenticate, see a l
 5. **Given** a user connected to a server instance, **When** they disconnect intentionally (logout or leave) or lose connection, **Then** they are no longer considered present for new chat deliveries (re-join behavior [NEEDS CLARIFICATION: should last character auto-reconnect?]).
 
 ### Edge Cases
-- Character list empty: authenticated user has zero characters (behavior [NEEDS CLARIFICATION: offer creation? block access?]).
+- Character list empty: authenticated user sees an empty roster state with a clear call-to-action that navigates them into the existing character creation flow; joining a server is blocked until at least one character exists.
 - Multiple simultaneous browser tabs using different characters (policy [NEEDS CLARIFICATION: allow concurrent sessions per account?]).
 - Rapid message sending approaching rate limits (expected handling [NEEDS CLARIFICATION: throttle vs. reject?]).
 - Oversized chat message exceeding maximum permitted length (expected result: rejection with user-facing error — max length value [NEEDS CLARIFICATION]).
@@ -95,7 +95,7 @@ As a returning player, I open the web client, successfully authenticate, see a l
 - **FR-014**: System MUST NOT expose characters belonging to other users in the selection list.
 - **FR-015**: System MUST restrict chat visibility so only players in the same server instance receive the messages (no cross-instance leakage).
 - **FR-016**: System MUST clearly communicate any failure to join (e.g., capacity reached) with a user-understandable reason. [NEEDS CLARIFICATION: list of possible join failure reasons in scope]
-- **FR-017**: System MUST handle an empty character list by presenting guidance or an action path (e.g., create character or exit). [NEEDS CLARIFICATION: is character creation part of this feature or separate?]
+- **FR-017**: System MUST, when the authenticated user has zero characters, present an empty-state UI and redirect (via action/CTA) into the existing character creation flow; server connection remains disabled until a character is created.
 - **FR-018**: System MUST ensure that disconnect events (intentional or unintentional) stop further chat reception and sending until reconnection.
 - **FR-019**: System MUST log session start and end events for audit / operational insight. [NEEDS CLARIFICATION: required retention / visibility of logs]
 - **FR-020**: System MUST provide baseline validation & sanitization of chat input to prevent injection of disallowed control sequences. [NEEDS CLARIFICATION: specific prohibited content scope]
@@ -110,29 +110,28 @@ As a returning player, I open the web client, successfully authenticate, see a l
 - **FR-027**: System MUST define maximum simultaneous players per server instance. [NEEDS CLARIFICATION: numeric capacity]
 
 ### Assumptions & Dependencies (Optional)
-- Existing character creation functionality already exists outside this feature scope (not implemented here). [NEEDS CLARIFICATION: confirm]
+- Existing character creation functionality already exists outside this feature scope and is reused (no duplicate inline creation form here).
 - There is at least one running server instance available for connections. [NEEDS CLARIFICATION: is server instance selection user-driven or automatic?]
 - Persistent storage of characters and user accounts exists. [NEEDS CLARIFICATION: any constraints on freshness or caching?]
 - Reliability targets (uptime, latency) not specified and need definition for test acceptance. [NEEDS CLARIFICATION]
 
 ### Open Questions (Consolidated)
-1. How is an empty character list handled (create flow included or separate)?
-2. Is server instance selection automatic, or can users choose among multiple instances?
-3. Are users shown prior chat history on join? If yes, how much and in what order?
-4. What is the maximum chat message length?
-5. What are the chat rate limit thresholds (messages per time window)?
-6. Are offensive content filtering or moderation requirements in scope?
-7. Should the sender see their own chat message echoed in the feed?
-8. Tie-break rule for identical timestamps (e.g., sequence counter vs. insertion order)?
-9. Numeric capacity limit per server instance?
-10. Reconnection grace period for transient disconnects?
-11. Multi-tab / multi-character concurrent session policy?
-12. Required backlog (if any) and limit (message count or time span)?
-13. Required visibility for other players (names vs. count only)?
-14. Join failure reason taxonomy to standardize user messaging?
-15. Logging retention and access expectations?
-16. Character switching policy after connection (explicit leave only?).
-17. Sanitization scope (which characters or formats are disallowed)?
+1. Is server instance selection automatic, or can users choose among multiple instances?
+2. Are users shown prior chat history on join? If yes, how much and in what order?
+3. What is the maximum chat message length?
+4. What are the chat rate limit thresholds (messages per time window)?
+5. Are offensive content filtering or moderation requirements in scope?
+6. Should the sender see their own chat message echoed in the feed?
+7. Tie-break rule for identical timestamps (e.g., sequence counter vs. insertion order)?
+8. Numeric capacity limit per server instance?
+9. Reconnection grace period for transient disconnects?
+10. Multi-tab / multi-character concurrent session policy?
+11. Required backlog (if any) and limit (message count or time span)?
+12. Required visibility for other players (names vs. count only)?
+13. Join failure reason taxonomy to standardize user messaging?
+14. Logging retention and access expectations?
+15. Character switching policy after connection (explicit leave only?).
+16. Sanitization scope (which characters or formats are disallowed)?
 
 ### Key Entities *(include if feature involves data)*
 - **User**: Represents an authenticated account; attributes: unique identifier, associated characters. (Credentials / auth details out of scope.)
@@ -179,5 +178,6 @@ As a returning player, I open the web client, successfully authenticate, see a l
 
 ### Session 2025-10-01
 - Q: What authentication approach will this feature use prior to character selection? → A: Entra ID External Identities (SSO)
+- Q: How should the system handle an authenticated user with zero characters? → A: Redirect to existing character creation flow (empty-state CTA, joining blocked)
 
 ---
