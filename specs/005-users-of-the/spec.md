@@ -61,7 +61,7 @@ As a returning player, I open the web client, successfully authenticate, see a l
 1. **Given** an authenticated user with at least one existing character, **When** they open the character selection view, choose a character, and explicitly click a "Connect" action/button, **Then** the system establishes a game session using that character and displays confirmation that they are connected (e.g., shows other player chat stream) and they can submit a chat message which is visible to other connected players.
 2. **Given** a user who has multiple characters, **When** they select a different character before joining, **Then** the system connects them using only the newly selected character and no data from an unselected character is applied to the session.
 3. **Given** a user connected to a server instance, **When** they send a chat message inside an allowed size and rate, **Then** all currently connected players on that same server instance see the message in ordered sequence.
-4. **Given** a user connected to a server instance, **When** another player joins, **Then** subsequent chat messages from that player appear for the user (historical backlog rules [NEEDS CLARIFICATION: is prior chat history shown to late joiners?]).
+4. **Given** a user connected to a server instance, **When** another player joins, **Then** subsequent chat messages from that player appear for the user (late joiners do NOT receive any pre-join chat history).
 5. **Given** a user connected to a server instance, **When** they disconnect intentionally (logout or leave) or lose connection, **Then** they are no longer considered present for new chat deliveries (re-join behavior [NEEDS CLARIFICATION: should last character auto-reconnect?]).
 
 ### Edge Cases
@@ -103,11 +103,11 @@ As a returning player, I open the web client, successfully authenticate, see a l
 - **FR-021**: System MUST expose a visible indicator of other players currently connected (at minimum a count or list). [NEEDS CLARIFICATION: which form—count vs. names?]
 - **FR-022**: System MUST prevent switching characters without first leaving the current server session (no mid-session identity swap).
 - **FR-023**: System MUST support at least one concurrent active session per authenticated user (multi-tab policy beyond that [NEEDS CLARIFICATION]).
-- **FR-024**: System MUST surface a user-facing error if message delivery fails (e.g., disconnected state) instead of silently dropping.
+ - **FR-024**: System MUST surface a user-facing error if message delivery fails (e.g., disconnected state) instead of silently dropping.
+ - **FR-025**: System MUST present no historical chat backlog on join; only messages accepted after the player's join timestamp are displayed.
  - **FR-028**: System MUST connect all users to a single global shared server instance (no manual selection UI) when they click Connect; multi-instance discovery / routing is explicitly out of scope for this feature but the design MUST NOT preclude adding multiple instances later.
 
 *Ambiguity Examples (retained intentionally for clarification):*
-- **FR-025**: System SHOULD (or MUST?) provide limited historical chat backlog on join. [NEEDS CLARIFICATION: backlog inclusion and size]
 - **FR-026**: System MUST moderate or filter disallowed language. [NEEDS CLARIFICATION: scope and enforcement approach] (If out of scope, remove.)
 - **FR-027**: System MUST define maximum simultaneous players per server instance. [NEEDS CLARIFICATION: numeric capacity]
 
@@ -119,21 +119,19 @@ As a returning player, I open the web client, successfully authenticate, see a l
 - Reliability targets (uptime, latency) not specified and need definition for test acceptance. [NEEDS CLARIFICATION]
 
 ### Open Questions (Consolidated)
-1. Are users shown prior chat history on join? If yes, how much and in what order?
-2. What is the maximum chat message length?
-3. What are the chat rate limit thresholds (messages per time window)?
-4. Are offensive content filtering or moderation requirements in scope?
-5. Should the sender see their own chat message echoed in the feed?
-6. Tie-break rule for identical timestamps (e.g., sequence counter vs. insertion order)?
-7. Numeric capacity limit per server instance? (Single instance still needs a limit.)
-8. Reconnection grace period for transient disconnects?
-9. Multi-tab / multi-character concurrent session policy?
-10. Required backlog (if any) and limit (message count or time span)?
-11. Required visibility for other players (names vs. count only)?
-12. Join failure reason taxonomy to standardize user messaging?
-13. Logging retention and access expectations?
-14. Character switching policy after connection (explicit leave only?).
-15. Sanitization scope (which characters or formats are disallowed)?
+1. What is the maximum chat message length?
+2. What are the chat rate limit thresholds (messages per time window)?
+3. Are offensive content filtering or moderation requirements in scope?
+4. Should the sender see their own chat message echoed in the feed?
+5. Tie-break rule for identical timestamps (e.g., sequence counter vs. insertion order)?
+6. Numeric capacity limit per server instance? (Single instance still needs a limit.)
+7. Reconnection grace period for transient disconnects?
+8. Multi-tab / multi-character concurrent session policy?
+9. Required visibility for other players (names vs. count only)?
+10. Join failure reason taxonomy to standardize user messaging?
+11. Logging retention and access expectations?
+12. Character switching policy after connection (explicit leave only?).
+13. Sanitization scope (which characters or formats are disallowed)?
 
 ### Key Entities *(include if feature involves data)*
 - **User**: Represents an authenticated account; attributes: unique identifier, associated characters. (Credentials / auth details out of scope.)
@@ -183,5 +181,6 @@ As a returning player, I open the web client, successfully authenticate, see a l
 - Q: How should the system handle an authenticated user with zero characters? → A: Redirect to existing character creation flow (empty-state CTA, joining blocked)
 - Q: How is the server instance selected for a user when they click Connect? → A: Single global shared instance (no selection UI)
 - Q: Will multiple server instances be supported now or only later? → A: Single instance now; future multi-instance expansion planned (design must not preclude)
+- Q: Should users see any prior chat history immediately upon joining the server? → A: No history (only messages after join)
 
 ---
