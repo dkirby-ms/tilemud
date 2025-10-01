@@ -44,3 +44,4 @@ logs
 *.log
 
 server/coverage/
+server/dist/
