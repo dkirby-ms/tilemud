@@ -31,16 +31,16 @@
 ## Phase 3.2: Tests First (TDD) – Contract & Integration Tests
 (Write tests to fail initially.)
 ### REST Contract Tests
-- [ ] T008 [FR-001][FR-002][P] Contract test POST /api/session/bootstrap in `server/tests/contract/session/bootstrap.post.spec.ts` (valid token returns state+version)
-- [ ] T009 [FR-012][P] Contract test GET /api/health in `server/tests/contract/health/get.spec.ts` (reports db+redis+version fields)
-- [ ] T010 [FR-009][P] Contract test GET /api/version in `server/tests/contract/version/get.spec.ts` (returns semantic version string)
+- [X] T008 [FR-001][FR-002][P] Contract test POST /api/session/bootstrap in `server/tests/contract/session/bootstrap.post.spec.ts` (valid token returns state+version)
+- [X] T009 [FR-012][P] Contract test GET /api/health in `server/tests/contract/health/get.spec.ts` (reports db+redis+version fields)
+- [X] T010 [FR-009][P] Contract test GET /api/version in `server/tests/contract/version/get.spec.ts` (returns semantic version string)
 ### Real-time Contract Tests
-- [ ] T011 [FR-002][FR-003][P] Contract test real-time handshake & join in `server/tests/contract/realtime/handshake.spec.ts` (ack & initial state delta)
-- [ ] T012 [FR-018][FR-010][P] Contract test intent.move validation & seq monotonic in `server/tests/contract/realtime/intent.move.spec.ts`
-- [ ] T013 [FR-015][FR-020][P] Contract test intent.chat rate limit rejection in `server/tests/contract/realtime/intent.chat.ratelimit.spec.ts`
-- [ ] T014 [FR-004][FR-010][P] Contract test intent.action generic dispatch & ack durability pre-ack in `server/tests/contract/realtime/intent.action.spec.ts`
-- [ ] T015 [FR-009][P] Contract test version mismatch disconnect in `server/tests/contract/realtime/version-mismatch.spec.ts`
-	- [ ] T084 [FR-007][P] Contract test idempotent duplicate action replay (same sequence) ignored / not duplicated in `server/tests/contract/realtime/idempotent-replay.spec.ts`
+- [X] T011 [FR-002][FR-003][P] Contract test real-time handshake & join in `server/tests/contract/realtime/handshake.spec.ts` (ack & initial state delta)
+- [X] T012 [FR-018][FR-010][P] Contract test intent.move validation & seq monotonic in `server/tests/contract/realtime/intent.move.spec.ts`
+- [X] T013 [FR-015][FR-020][P] Contract test intent.chat rate limit rejection in `server/tests/contract/realtime/intent.chat.ratelimit.spec.ts`
+- [X] T014 [FR-004][FR-010][P] Contract test intent.action generic dispatch & ack durability pre-ack in `server/tests/contract/realtime/intent.action.spec.ts`
+- [X] T015 [FR-009][P] Contract test version mismatch disconnect in `server/tests/contract/realtime/version-mismatch.spec.ts`
+	- [X] T084 [FR-007][P] Contract test idempotent duplicate action replay (same sequence) ignored / not duplicated in `server/tests/contract/realtime/idempotent-replay.spec.ts`
 ### Data Model / Persistence Contract Tests
 - [ ] T016 [FR-004][P] Model test CharacterProfile persistence + updated_at concurrency in `server/tests/contract/models/character-profile.spec.ts`
 - [ ] T017 [FR-004][FR-011][P] Model test ActionEvent write-before-ack guarantee in `server/tests/contract/models/action-event-durability.spec.ts`
