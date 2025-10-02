@@ -1,5 +1,16 @@
 import type { Pool } from "pg";
 
+interface ActionEventRow {
+  action_id: string;
+  session_id: string;
+  user_id: string;
+  character_id: string;
+  sequence_number: number;
+  action_type: ActionEventType;
+  payload_json: Record<string, unknown> | null;
+  persisted_at: Date;
+}
+
 export type ActionEventType = "move" | "chat" | "ability" | "system";
 
 export interface ActionEventRecord {
@@ -35,24 +46,82 @@ export class ActionEventPersistenceError extends Error {
   }
 }
 
-class NotImplementedActionEventRepository implements ActionEventRepository {
-  constructor(_pool: Pool) {
-    // dependencies wired during implementation task T029
+class PostgresActionEventRepository implements ActionEventRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async appendAction(input: AppendActionEventInput): Promise<ActionEventRecord> {
+    try {
+      const result = await this.pool.query<ActionEventRow>(
+        `INSERT INTO action_events (
+          session_id,
+          user_id,
+          character_id,
+          sequence_number,
+          action_type,
+          payload_json
+        )
+        VALUES ($1, $2, $3, $4, $5, $6::jsonb)
+        RETURNING action_id, session_id, user_id, character_id, sequence_number, action_type, payload_json, persisted_at`,
+        [
+          input.sessionId,
+          input.userId,
+          input.characterId,
+          input.sequenceNumber,
+          input.actionType,
+          JSON.stringify(input.payload ?? {})
+        ]
+      );
+
+      return this.mapRow(result.rows[0]);
+    } catch (error) {
+      throw new ActionEventPersistenceError(error instanceof Error ? error.message : undefined);
+    }
   }
 
-  async appendAction(): Promise<ActionEventRecord> {
-    throw new Error("ActionEventRepository.appendAction not implemented");
+  async listRecentForCharacter(characterId: string, limit = 50): Promise<ActionEventRecord[]> {
+    const result = await this.pool.query<ActionEventRow>(
+      `SELECT action_id, session_id, user_id, character_id, sequence_number, action_type, payload_json, persisted_at
+       FROM action_events
+       WHERE character_id = $1
+       ORDER BY sequence_number DESC
+       LIMIT $2`,
+      [characterId, limit]
+    );
+
+    return result.rows.map((row) => this.mapRow(row));
   }
 
-  async listRecentForCharacter(): Promise<ActionEventRecord[]> {
-    throw new Error("ActionEventRepository.listRecentForCharacter not implemented");
+  async getLatestForSession(sessionId: string): Promise<ActionEventRecord | null> {
+    const result = await this.pool.query<ActionEventRow>(
+      `SELECT action_id, session_id, user_id, character_id, sequence_number, action_type, payload_json, persisted_at
+       FROM action_events
+       WHERE session_id = $1
+       ORDER BY sequence_number DESC
+       LIMIT 1`,
+      [sessionId]
+    );
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    return this.mapRow(result.rows[0]);
   }
 
-  async getLatestForSession(): Promise<ActionEventRecord | null> {
-    throw new Error("ActionEventRepository.getLatestForSession not implemented");
+  private mapRow(row: ActionEventRow): ActionEventRecord {
+    return {
+      actionId: row.action_id,
+      sessionId: row.session_id,
+      userId: row.user_id,
+      characterId: row.character_id,
+      sequenceNumber: Number(row.sequence_number),
+      actionType: row.action_type,
+      payload: row.payload_json ?? {},
+      persistedAt: new Date(row.persisted_at)
+    };
   }
 }
 
 export function createActionEventRepository(pool: Pool): ActionEventRepository {
-  return new NotImplementedActionEventRepository(pool);
+  return new PostgresActionEventRepository(pool);
 }
