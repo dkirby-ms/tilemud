@@ -42,38 +42,38 @@
 - [X] T015 [FR-009][P] Contract test version mismatch disconnect in `server/tests/contract/realtime/version-mismatch.spec.ts`
 	- [X] T084 [FR-007][P] Contract test idempotent duplicate action replay (same sequence) ignored / not duplicated in `server/tests/contract/realtime/idempotent-replay.spec.ts`
 ### Data Model / Persistence Contract Tests
-- [ ] T016 [FR-004][P] Model test CharacterProfile persistence + updated_at concurrency in `server/tests/contract/models/character-profile.spec.ts`
-- [ ] T017 [FR-004][FR-011][P] Model test ActionEvent write-before-ack guarantee in `server/tests/contract/models/action-event-durability.spec.ts`
+- [X] T016 [FR-004][P] Model test CharacterProfile persistence + updated_at concurrency in `server/tests/contract/models/character-profile.spec.ts`
+- [X] T017 [FR-004][FR-011][P] Model test ActionEvent write-before-ack guarantee in `server/tests/contract/models/action-event-durability.spec.ts`
 ### Integration (User Story) Tests (Quickstart Derived)
-- [ ] T018 [FR-001][FR-002][FR-003][P] Integration test full connect flow in `server/tests/integration/connect-flow.spec.ts` (CONNECTING→ACTIVE)
-- [ ] T019 [FR-003][NFR-001][P] Integration test movement latency instrumentation in `server/tests/integration/movement-latency.spec.ts`
-- [ ] T020 [FR-008][FR-007][NFR-004][P] Integration test reconnect sequence recovery in `server/tests/integration/reconnect-sequence.spec.ts`
-- [ ] T021 [FR-006][FR-015][P] Integration test Redis degraded state surface in `server/tests/integration/redis-degraded.spec.ts`
-- [ ] T022 [FR-015][FR-012][P] Integration test DB outage UNAVAILABLE handling in `server/tests/integration/db-unavailable.spec.ts`
-- [ ] T023 [FR-017][P] Integration test inactivity timeout termination in `server/tests/integration/inactivity-timeout.spec.ts`
-- [ ] T024 [FR-009][FR-015][P] Integration test version mismatch UPDATE_REQUIRED UX in `web-client/tests/integration/version-mismatch.spec.ts`
-- [ ] T025 [FR-008][FR-007][P] Integration test client reconnect UI state transitions in `web-client/tests/integration/reconnect-ui.spec.ts`
+- [X] T018 [FR-001][FR-002][FR-003][P] Integration test full connect flow in `server/tests/integration/connect-flow.spec.ts` (CONNECTING→ACTIVE)
+- [X] T019 [FR-003][NFR-001][P] Integration test movement latency instrumentation in `server/tests/integration/movement-latency.spec.ts`
+- [X] T020 [FR-008][FR-007][NFR-004][P] Integration test reconnect sequence recovery in `server/tests/integration/reconnect-sequence.spec.ts`
+- [X] T021 [FR-006][FR-015][P] Integration test Redis degraded state surface in `server/tests/integration/redis-degraded.spec.ts`
+- [X] T022 [FR-015][FR-012][P] Integration test DB outage UNAVAILABLE handling in `server/tests/integration/db-unavailable.spec.ts`
+- [X] T023 [FR-017][P] Integration test inactivity timeout termination in `server/tests/integration/inactivity-timeout.spec.ts`
+- [X] T024 [FR-009][FR-015][P] Integration test version mismatch UPDATE_REQUIRED UX in `web-client/tests/integration/version-mismatch.spec.ts`
+- [X] T025 [FR-008][FR-007][P] Integration test client reconnect UI state transitions in `web-client/tests/integration/reconnect-ui.spec.ts`
 ### Frontend Contract/UI State Tests
-- [ ] T026 [FR-008][FR-015][P] Client state store test for session status transitions in `web-client/tests/contract/session-store.spec.ts`
-- [ ] T027 [FR-003][FR-005][P] Client reducer test for applying event.state_delta in `web-client/tests/contract/state-delta.reducer.spec.ts`
+- [X] T026 [FR-008][FR-015][P] Client state store test for session status transitions in `web-client/tests/contract/session-store.spec.ts`
+- [X] T027 [FR-003][FR-005][P] Client reducer test for applying event.state_delta in `web-client/tests/contract/state-delta.reducer.spec.ts`
 
 ### Performance & Freshness Tests (Added for Critical Coverage Gaps)
-- [ ] T074 [FR-002][NFR-002][P] Initial load performance test measuring cold start client load p95 ≤3s in `web-client/tests/integration/initial-load-performance.spec.ts`
-- [ ] T075 [FR-005][NFR-001][P] Freshness window enforcement test simulating stale cache (>100ms) triggering forced refresh in `server/tests/integration/freshness-window.spec.ts`
-	- [ ] T085 [NFR-003][FR-019][P] Synthetic availability SLO test simulating mixed success/failure action stream to assert computed availability ≥99.5% and alert trigger on breach in `server/tests/integration/availability-slo.spec.ts`
+- [X] T074 [FR-002][NFR-002][P] Initial load performance test measuring cold start client load p95 ≤3s in `web-client/tests/integration/initial-load-performance.spec.ts`
+- [X] T075 [FR-005][NFR-001][P] Freshness window enforcement test simulating stale cache (>100ms) triggering forced refresh in `server/tests/integration/freshness-window.spec.ts`
+	- [X] T085 [NFR-003][FR-019][P] Synthetic availability SLO test simulating mixed success/failure action stream to assert computed availability ≥99.5% and alert trigger on breach in `server/tests/integration/availability-slo.spec.ts`
 
 ### Additional Coverage Tests (High Severity Gaps)
-- [ ] T076 [FR-011][P] Atomic multi-step rollback test inducing partial failure and asserting ACTION_ATOMIC_ROLLBACK in `server/tests/contract/atomic-action-rollback.spec.ts`
-- [ ] T077 [FR-013][NFR-006][P] Authorization isolation test ensuring cross-user access denied with FORBIDDEN in `server/tests/contract/authorization-isolation.spec.ts`
-- [ ] T078 [FR-016][NFR-004][P] Restart recovery persistence test simulating server restart + reconnect without acknowledged action loss in `server/tests/integration/restart-recovery.spec.ts`
-- [ ] T079 [FR-020][P] Error contract schema test validating canonical error shape & categories in `server/tests/contract/error-contract.spec.ts`
-- [ ] T080 [FR-001][FR-015][P] Capacity + invalid token UX test covering capacity denial & token rejection messaging in `server/tests/integration/capacity-auth-failures.spec.ts`
-- [ ] T081 [FR-019][NFR-008][P] Metrics threshold detection test asserting alert conditions are triggered under simulated failure ratios in `server/tests/integration/metrics-threshold.spec.ts`
-- [ ] T082 [FR-014][NFR-007][P] Log redaction verification test scanning emitted logs for prohibited fields in `server/tests/integration/log-redaction.spec.ts`
- - [ ] T083 [NFR-008][NFR-001][P] Client diagnostics overlay test verifying latency + reconnect indicators visible in dev build `web-client/tests/contract/client-diagnostics.spec.ts`
- - [ ] T086 [FR-005][FR-006][P] Cache warm-up race consistency test ensuring no mixed-era state exposure under concurrent cold reads in `server/tests/integration/cache-warmup-race.spec.ts`
- - [ ] T087 [FR-009][FR-015][P] Mid-session version deprecation test forcing version bump → client disconnect & update-required messaging in `server/tests/integration/mid-session-version-deprecation.spec.ts`
- - [ ] T088 [FR-014][NFR-007][P] Log retention configuration test verifying 30-day retention / rotation policy (simulated config inspection) in `server/tests/integration/log-retention.spec.ts`
+- [X] T076 [FR-011][P] Atomic multi-step rollback test inducing partial failure and asserting ACTION_ATOMIC_ROLLBACK in `server/tests/contract/atomic-action-rollback.spec.ts`
+- [X] T077 [FR-013][NFR-006][P] Authorization isolation test ensuring cross-user access denied with FORBIDDEN in `server/tests/contract/authorization-isolation.spec.ts`
+- [X] T078 [FR-016][NFR-004][P] Restart recovery persistence test simulating server restart + reconnect without acknowledged action loss in `server/tests/integration/restart-recovery.spec.ts`
+- [X] T079 [FR-020][P] Error contract schema test validating canonical error shape & categories in `server/tests/contract/error-contract.spec.ts`
+- [X] T080 [FR-001][FR-015][P] Capacity + invalid token UX test covering capacity denial & token rejection messaging in `server/tests/integration/capacity-auth-failures.spec.ts`
+- [X] T081 [FR-019][NFR-008][P] Metrics threshold detection test asserting alert conditions are triggered under simulated failure ratios in `server/tests/integration/metrics-threshold.spec.ts`
+- [X] T082 [FR-014][NFR-007][P] Log redaction verification test scanning emitted logs for prohibited fields in `server/tests/integration/log-redaction.spec.ts`
+- [X] T083 [NFR-008][NFR-001][P] Client diagnostics overlay test verifying latency + reconnect indicators visible in dev build `web-client/tests/contract/client-diagnostics.spec.ts`
+- [X] T086 [FR-005][FR-006][P] Cache warm-up race consistency test ensuring no mixed-era state exposure under concurrent cold reads in `server/tests/integration/cache-warmup-race.spec.ts`
+- [X] T087 [FR-009][FR-015][P] Mid-session version deprecation test forcing version bump → client disconnect & update-required messaging in `server/tests/integration/mid-session-version-deprecation.spec.ts`
+- [X] T088 [FR-014][NFR-007][P] Log retention configuration test verifying 30-day retention / rotation policy (simulated config inspection) in `server/tests/integration/log-retention.spec.ts`
 
 ## Phase 3.3: Core Models & Schemas (Implement after corresponding tests failing)
 - [ ] T028 [P] Implement CharacterProfile model + repository in `server/src/models/characterProfile.ts`
