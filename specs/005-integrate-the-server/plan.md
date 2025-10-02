@@ -31,13 +31,13 @@
 - Phase 3-4: Implementation execution (manual or via tools)
 
 ## Summary
-Integrate the authoritative multiplayer game server into the existing repository and connect the React web client to it with end‑to‑end, test‑driven implementation. Core goals:
-1. Establish server authoritative real‑time session (Colyseus) with strict version lockstep (FR-001/FR-002) and freshness window (FR-005; ≤100ms p95).
-2. Provide durable per‑action persistence (FR-006) with atomic rollback on partial failure (FR-011) and restart recovery reconstruction from durable logs (FR-012).
-3. Implement reconnect flow with exponential full‑jitter backoff and token validation (FR-008/FR-009) while preserving session continuity metrics.
-4. Expose consistent typed contracts (messages + REST where needed) validated via zod and contract tests (FR-003/FR-004).
-5. Deliver observability: structured redacted logging, metrics enumeration (FR-019 / NFR-008), client diagnostics overlay (FR-018) and performance conformance to NFR-001 (action latency ≤200ms p95) and NFR-002 (initial load ≤3s p95, stretch 2s).
-6. Enforce security/privacy constraints (single PLAYER role, no raw credentials in logs, hashed session identifiers) and prepare extension surface for future roles without over‑design.
+Integrate the authoritative multiplayer game server into the existing repository and connect the React web client to it with end‑to‑end, test‑driven implementation. Core goals (corrected FR mappings):
+1. Establish server authoritative real‑time session (Colyseus) with strict version lockstep (FR-009), validated session tokens (FR-001), timely initial authoritative state (FR-002) and freshness window (FR-005; ≤100ms p95).
+2. Provide durable per‑action persistence (FR-004) with atomic rollback on partial failure (FR-011) and restart recovery reconstruction from durable state (FR-016) — health/readiness reporting remains separate (FR-012).
+3. Implement reconnect flow with exponential full‑jitter backoff (FR-008) including token validation (FR-001) and version gating (FR-009) while preserving action ordering and continuity metrics (FR-018, FR-019, NFR-004).
+4. Expose consistent typed contracts (messages + REST where needed) validated via zod and contract tests (FR-003 propagation, FR-010 validation, FR-020 error contract, plus FR-002/FR-005 performance freshness implications).
+5. Deliver observability: structured redacted logging (FR-014 / NFR-007), metrics enumeration and alert conditions (FR-019 / NFR-008), client diagnostics overlay (T083) and performance conformance to NFR-001 (action latency ≤200ms p95) and NFR-002 (initial load ≤3s p95, stretch 2s).
+6. Enforce security/privacy constraints (authorization boundary FR-013, security baseline NFR-006, privacy logging NFR-007) and prepare extension surface for future roles without over‑design.
 
 All NEEDS CLARIFICATION markers in the original spec have been resolved; remaining open items are strategic follow‑ups (not blockers) documented below.
 
@@ -200,7 +200,7 @@ No deviations from constitution principles at this stage (table intentionally om
 - [x] Phase 0: Research complete (/plan command)
 - [x] Phase 1: Design complete (/plan command)
 - [x] Phase 2: Task planning approach documented (/plan output)
-- [x] Phase 3: Tasks generated (`tasks.md` T001–T083)
+- [x] Phase 3: Tasks generated (`tasks.md` T001–T088)
 - [ ] Phase 4: Implementation complete
 - [ ] Phase 5: Validation passed
 
@@ -211,4 +211,4 @@ No deviations from constitution principles at this stage (table intentionally om
 - [x] Complexity deviations documented (none required)
 
 ---
-*Based on Constitution v2.1.1 - See `/memory/constitution.md`*
+*Based on Constitution v1.0.0 - See `/memory/constitution.md`*

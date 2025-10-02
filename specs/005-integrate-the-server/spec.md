@@ -160,6 +160,8 @@ All prior clarification markers have been resolved and incorporated above.
 - **Action/Event Message**: Structured description of a player action or server broadcast (type, sequence number, timestamp, payload metadata).
 - **Synchronization Token**: Versioned marker capturing last applied state boundary (sequence number + logical time) enabling differential resync.
 - **Health Indicator Composite**: Aggregated readiness signals for core dependencies and capacity.
+ - **Reconnect Token (Alias of Synchronization Token)**: Same logical construct referenced in tasks; used specifically during reconnect authorization and differential sync boundary evaluation (unified concept to avoid duplication).
+ - **Metrics Snapshot**: Ephemeral aggregation of recent metrics (latency histogram quantiles, counters) used for threshold evaluation (FR-019 / NFR-008) and client diagnostics overlay; not persisted beyond rolling window.
 
 ### Relationships (Conceptual)
 - Player Session links to one Character Profile (active selection).
