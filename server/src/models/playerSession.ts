@@ -1,5 +1,3 @@
-import { performance } from "node:perf_hooks";
-
 export type PlayerSessionStatus = "connecting" | "active" | "reconnecting" | "terminating";
 
 export interface PlayerSessionState {
