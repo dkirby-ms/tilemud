@@ -20,13 +20,13 @@
 - [P] indicates task can be executed in parallel with other [P] tasks (distinct files & no unmet dependencies)
 
 ## Phase 3.1: Setup & Baseline Infrastructure
-- [ ] T001 Ensure infra scripts running: verify PostgreSQL + Redis availability (`./infrastructure/scripts/infra-verify.sh`) and create failing placeholder if not (no code change) (dependency: none)
-- [ ] T002 Add server contract generation directory scaffold `server/src/contracts/` (index.ts + README placeholder) (blocks contract type exports)
-- [ ] T003 Configure version lock constant & export in `server/src/infra/version.ts` and stub client consumption in `web-client/src/app/version.ts` (blocks version tests)
-- [ ] T004 [P] Add pino logger initialization file `server/src/logging/logger.ts` with structured base fields (blocks logging usage)
-- [ ] T005 [P] Add Redis client bootstrap `server/src/infra/redis.ts` (lazy connection + health check fn) (blocks degraded state tests)
-- [ ] T006 [P] Add PostgreSQL pool bootstrap `server/src/infra/db.ts` (pg.Pool + simple health query) (blocks durability tests)
-- [ ] T007 Add metrics instrumentation scaffold `server/src/infra/metrics.ts` exporting counters/histogram placeholders (blocks metrics tests)
+- [X] T001 Ensure infra scripts running: verify PostgreSQL + Redis availability (`./infrastructure/scripts/infra-verify.sh`) and create failing placeholder if not (no code change) (dependency: none)
+- [X] T002 Add server contract generation directory scaffold `server/src/contracts/` (index.ts + README placeholder) (blocks contract type exports)
+- [X] T003 Configure version lock constant & export in `server/src/infra/version.ts` and stub client consumption in `web-client/src/app/version.ts` (blocks version tests)
+- [X] T004 [P] Add pino logger initialization file `server/src/logging/logger.ts` with structured base fields (blocks logging usage)
+- [X] T005 [P] Add Redis client bootstrap `server/src/infra/redis.ts` (lazy connection + health check fn) (blocks degraded state tests)
+- [X] T006 [P] Add PostgreSQL pool bootstrap `server/src/infra/db.ts` (pg.Pool + simple health query) (blocks durability tests)
+- [X] T007 Add metrics instrumentation scaffold `server/src/infra/metrics.ts` exporting counters/histogram placeholders (blocks metrics tests)
 
 ## Phase 3.2: Tests First (TDD) – Contract & Integration Tests
 (Write tests to fail initially.)
