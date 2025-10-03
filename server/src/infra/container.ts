@@ -12,6 +12,10 @@ import { OutcomeService } from "../services/outcomeService.js";
 import { ReconnectService } from "../services/reconnectService.js";
 import { ActionPipeline } from "../services/actionPipeline.js";
 import { RuleSetService } from "../services/rulesetService.js";
+import { createCharacterProfileRepository, CharacterProfileRepository } from "../models/characterProfile.js";
+import { PlayerSessionStore } from "../models/playerSession.js";
+import { createInMemoryReconnectTokenStore, ReconnectTokenStore } from "../models/reconnectToken.js";
+import { SessionBootstrapService } from "../services/sessionBootstrapService.js";
 import type { Pool } from "pg";
 import type { RedisClientType } from "redis";
 import { getAppLogger, type AppLogger } from "../logging/logger.js";
@@ -33,6 +37,10 @@ export interface Container {
   outcomeService: OutcomeService;
   reconnectService: ReconnectService;
   actionPipeline: ActionPipeline;
+  characterProfileRepository: CharacterProfileRepository;
+  playerSessionStore: PlayerSessionStore;
+  reconnectTokenStore: ReconnectTokenStore;
+  sessionBootstrapService: SessionBootstrapService;
   logger: AppLogger;
 }
 
@@ -68,6 +76,14 @@ export async function initializeContainer(): Promise<Container> {
     defaultGracePeriodMs: 60_000
   });
   const actionPipeline = new ActionPipeline({ rateLimiter });
+  const characterProfileRepository = createCharacterProfileRepository(postgres);
+  const playerSessionStore = new PlayerSessionStore();
+  const reconnectTokenStore = createInMemoryReconnectTokenStore();
+  const sessionBootstrapService = new SessionBootstrapService({
+    characterProfiles: characterProfileRepository,
+    playerSessions: playerSessionStore,
+    reconnectTokens: reconnectTokenStore
+  });
 
   container = {
     config,
@@ -86,6 +102,10 @@ export async function initializeContainer(): Promise<Container> {
     outcomeService,
     reconnectService,
     actionPipeline,
+    characterProfileRepository,
+    playerSessionStore,
+    reconnectTokenStore,
+    sessionBootstrapService,
     logger,
   };
 

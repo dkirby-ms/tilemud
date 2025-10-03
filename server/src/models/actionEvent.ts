@@ -37,6 +37,7 @@ export interface ActionEventRepository {
   appendAction(input: AppendActionEventInput): Promise<ActionEventRecord>;
   listRecentForCharacter(characterId: string, limit?: number): Promise<ActionEventRecord[]>;
   getLatestForSession(sessionId: string): Promise<ActionEventRecord | null>;
+  getBySessionAndSequence(sessionId: string, sequenceNumber: number): Promise<ActionEventRecord | null>;
 }
 
 export class ActionEventPersistenceError extends Error {
@@ -99,6 +100,22 @@ class PostgresActionEventRepository implements ActionEventRepository {
        ORDER BY sequence_number DESC
        LIMIT 1`,
       [sessionId]
+    );
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    return this.mapRow(result.rows[0]);
+  }
+
+  async getBySessionAndSequence(sessionId: string, sequenceNumber: number): Promise<ActionEventRecord | null> {
+    const result = await this.pool.query<ActionEventRow>(
+      `SELECT action_id, session_id, user_id, character_id, sequence_number, action_type, payload_json, persisted_at
+       FROM action_events
+       WHERE session_id = $1 AND sequence_number = $2
+       LIMIT 1`,
+      [sessionId, sequenceNumber]
     );
 
     if (result.rows.length === 0) {

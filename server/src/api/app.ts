@@ -6,6 +6,7 @@ import { createOutcomesRouter } from "./outcomes.js";
 import { createPlayerMessagesRouter } from "./playerMessages.js";
 import { createErrorCatalogRouter } from "./errorCatalog.js";
 import { createErrorMiddleware } from "./errorMiddleware.js";
+import { createSessionBootstrapRouter } from "./sessionBootstrap.js";
 
 export function createApp(existingContainer?: Container): Express {
   const app = express();
@@ -16,6 +17,7 @@ export function createApp(existingContainer?: Container): Express {
 
   // Routers
   app.use(createHealthRouter(logger));
+  app.use(createSessionBootstrapRouter({ service: container.sessionBootstrapService, logger }));
   app.use(createOutcomesRouter({ outcomeService: container.outcomeService, logger }));
   app.use(createPlayerMessagesRouter({ messageService: container.messageService, logger }));
   app.use(createErrorCatalogRouter({ errorCatalog: container.errorCatalog, logger }));

@@ -76,24 +76,24 @@
 - [X] T088 [FR-014][NFR-007][P] Log retention configuration test verifying 30-day retention / rotation policy (simulated config inspection) in `server/tests/integration/log-retention.spec.ts`
 
 ## Phase 3.3: Core Models & Schemas (Implement after corresponding tests failing)
-- [ ] T028 [P] Implement CharacterProfile model + repository in `server/src/models/characterProfile.ts`
-- [ ] T029 [P] Implement ActionEvent model + append function in `server/src/models/actionEvent.ts`
-- [ ] T030 [P] Implement PlayerSession runtime tracker in `server/src/models/playerSession.ts`
-- [ ] T031 [P] Implement ReconnectToken ephemeral structure in `server/src/models/reconnectToken.ts`
-- [ ] T032 Define zod schemas for real-time intents/events in `server/src/contracts/realtimeSchemas.ts` (exports types to client build)
-- [ ] T033 Define REST contract zod schemas in `server/src/contracts/restSchemas.ts` (session bootstrap, health, version)
++ [X] T028 [P] Implement CharacterProfile model + repository in `server/src/models/characterProfile.ts`
++ [X] T029 [P] Implement ActionEvent model + append function in `server/src/models/actionEvent.ts`
++ [X] T030 [P] Implement PlayerSession runtime tracker in `server/src/models/playerSession.ts`
++ [X] T031 [P] Implement ReconnectToken ephemeral structure in `server/src/models/reconnectToken.ts`
++ [X] T032 Define zod schemas for real-time intents/events in `server/src/contracts/realtimeSchemas.ts` (exports types to client build)
++ [X] T033 Define REST contract zod schemas in `server/src/contracts/restSchemas.ts` (session bootstrap, health, version)
 
 ## Phase 3.4: Services & Infrastructure Logic
-- [ ] T034 Implement session bootstrap service `server/src/services/sessionBootstrapService.ts` (token validate stub + initial snapshot)
-- [ ] T035 Implement version service `server/src/services/versionService.ts` (reads constant, provides comparison helpers)
-- [ ] T036 Implement movement/action sequencing service `server/src/services/actionSequenceService.ts`
-- [ ] T037 Implement action durability pipeline `server/src/services/actionDurabilityService.ts` (persist-before-ack logic)
-- [ ] T038 Implement reconnect flow service `server/src/services/reconnectService.ts` (delta vs snapshot selection)
-- [ ] T039 Implement metrics emission wrappers in `server/src/services/metricsService.ts`
-- [ ] T040 Implement degraded state detection (Redis health to broadcast) in `server/src/services/degradedSignalService.ts`
+- [X] T034 Implement session bootstrap service `server/src/services/sessionBootstrapService.ts` (token validate stub + initial snapshot)
+- [X] T035 Implement version service `server/src/services/versionService.ts` (reads constant, provides comparison helpers)
+- [X] T036 Implement movement/action sequencing service `server/src/services/actionSequenceService.ts`
+- [X] T037 Implement action durability pipeline `server/src/services/actionDurabilityService.ts` (persist-before-ack logic)
+- [X] T038 Implement reconnect flow service `server/src/services/reconnectService.ts` (delta vs snapshot selection)
+- [X] T039 Implement metrics emission wrappers in `server/src/services/metricsService.ts`
+- [X] T040 Implement degraded state detection (Redis health to broadcast) in `server/src/services/degradedSignalService.ts`
 
 ## Phase 3.5: Endpoints & Real-time Room Implementation
-- [ ] T041 Implement POST /api/session/bootstrap Express handler `server/src/api/sessionBootstrap.ts`
+- [X] T041 Implement POST /api/session/bootstrap Express handler `server/src/api/sessionBootstrap.ts`
 - [ ] T042 Implement GET /api/health Express handler `server/src/api/health.ts`
 - [ ] T043 Implement GET /api/version Express handler `server/src/api/version.ts`
 - [ ] T044 Implement Colyseus room for player sessions `server/src/rooms/GameRoom.ts` (handshake, join, broadcast deltas)
