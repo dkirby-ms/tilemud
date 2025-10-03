@@ -8,6 +8,13 @@
 import type { ApiError, ValidationError, ServiceOutage } from './domain';
 import { HTTP_STATUS, MSAL_ERROR_CODES } from './utils';
 
+type StackTraceCapture = {
+  captureStackTrace?: (
+    target: Error,
+    constructorOpt?: new (...args: unknown[]) => unknown
+  ) => void;
+};
+
 /**
  * React Error Info interface for error boundaries
  */
@@ -180,7 +187,11 @@ export abstract class AppErrorClass extends Error {
     
     // Maintain proper stack trace for debugging
     if ('captureStackTrace' in Error) {
-      (Error as any).captureStackTrace(this, this.constructor);
+      const captureStackTrace = (Error as StackTraceCapture).captureStackTrace;
+      if (typeof captureStackTrace === 'function') {
+        const errorConstructor = this.constructor as new (...args: unknown[]) => unknown;
+        captureStackTrace(this, errorConstructor);
+      }
     }
   }
 
@@ -257,8 +268,20 @@ export class AuthErrorClass extends AppErrorClass {
     this.suggestedAction = suggestedAction;
   }
 
-  static fromMsalError(error: any): AuthErrorClass {
-    const errorCode = error.errorCode || error.name || 'unknown_auth_error';
+  static fromMsalError(error: unknown): AuthErrorClass {
+    const fallback = 'unknown_auth_error';
+    const errorInfo =
+      typeof error === 'object' && error !== null
+        ? (error as {
+            errorCode?: unknown;
+            name?: unknown;
+            message?: unknown;
+          })
+        : {};
+
+    const errorCodeValue = errorInfo.errorCode ?? errorInfo.name;
+    const errorCode = typeof errorCodeValue === 'string' ? errorCodeValue : fallback;
+    const errorMessage = typeof errorInfo.message === 'string' ? errorInfo.message : 'Authentication failed';
     
     switch (errorCode) {
       case MSAL_ERROR_CODES.INTERACTION_REQUIRED:
@@ -288,7 +311,7 @@ export class AuthErrorClass extends AppErrorClass {
       
       default:
         return new AuthErrorClass(
-          error.message || 'Authentication failed',
+          errorMessage,
           errorCode,
           false,
           'contact_support'
@@ -407,12 +430,12 @@ export function isAppError<T extends AppError['type']>(
   error: unknown,
   type: T
 ): error is Extract<AppError, { type: T }> {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'type' in error &&
-    (error as any).type === type
-  );
+  if (typeof error !== 'object' || error === null || !('type' in error)) {
+    return false;
+  }
+
+  const candidate = error as Partial<AppError>;
+  return candidate.type === type;
 }
 
 /**

@@ -10,7 +10,8 @@
 
 import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, RequireAuth, useAuth } from '../providers/AuthProvider';
+import { AuthProvider, RequireAuth } from '../providers/AuthProvider';
+import { useAuth } from '../providers/authContext';
 import { CharacterDashboardPage } from '../features/character/pages/CharacterDashboardPage';
 import { LogoutButton } from '../features/auth/LogoutButton';
 import { initializeCharacterClient } from '../features/character/api/characterClient';

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 import { useLogout } from '../../src/features/auth/useLogout';
 import { TestAuthWrapper } from '../utils/testAuthWrapper';
 

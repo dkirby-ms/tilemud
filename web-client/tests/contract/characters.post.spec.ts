@@ -1,4 +1,18 @@
 import { describe, it, expect } from 'vitest';
+import type { CreateCharacterRequest } from '@/types/domain';
+
+const asRecord = (value: unknown): Record<string, unknown> => {
+  expect(typeof value).toBe('object');
+  expect(value).not.toBeNull();
+  return value as Record<string, unknown>;
+};
+
+const expectStringProperty = (record: Record<string, unknown>, key: string): string => {
+  expect(record).toHaveProperty(key);
+  const value = record[key];
+  expect(typeof value).toBe('string');
+  return value as string;
+};
 
 /**
  * Contract test for POST /api/players/me/characters
@@ -18,7 +32,7 @@ import { describe, it, expect } from 'vitest';
 describe('Contract: POST /api/players/me/characters', () => {
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
-  const createCharacterPayload = (overrides: any = {}) => ({
+  const createCharacterPayload = (overrides: Partial<CreateCharacterRequest> = {}): CreateCharacterRequest => ({
     name: 'Gandalf',
     archetypeId: 'wizard-001',
     ...overrides
@@ -39,26 +53,24 @@ describe('Contract: POST /api/players/me/characters', () => {
     expect(response.status).toBe(201);
     expect(response.headers.get('content-type')).toMatch(/application\/json/);
 
-    const data = await response.json();
+  const data: unknown = await response.json();
+  const character = asRecord(data);
 
-    // Validate Character schema
-    expect(data).toHaveProperty('id');
-    expect(typeof data.id).toBe('string');
-    expect(data.id).toMatch(/^[0-9a-f-]{36}$/i); // UUID format
+  const id = expectStringProperty(character, 'id');
+  expect(id).toMatch(/^[0-9a-f-]{36}$/i); // UUID format
 
-    expect(data).toHaveProperty('name');
-    expect(data.name).toBe(payload.name);
-    expect(data.name).toMatch(/^[A-Z][a-z]+$/); // Name pattern
+  const name = expectStringProperty(character, 'name');
+  expect(name).toBe(payload.name);
+  expect(name).toMatch(/^[A-Z][a-z]+$/); // Name pattern
 
-    expect(data).toHaveProperty('archetypeId');
-    expect(data.archetypeId).toBe(payload.archetypeId);
+  const archetypeId = expectStringProperty(character, 'archetypeId');
+  expect(archetypeId).toBe(payload.archetypeId);
 
-    expect(data).toHaveProperty('createdAt');
-    expect(typeof data.createdAt).toBe('string');
-    expect(data.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/);
+  const createdAt = expectStringProperty(character, 'createdAt');
+  expect(createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/);
 
-    expect(data).toHaveProperty('status');
-    expect(data.status).toBe('active');
+  const status = expectStringProperty(character, 'status');
+  expect(status).toBe('active');
   });
 
   it('should return 400 for invalid name pattern', async () => {

@@ -28,6 +28,49 @@ export type {
   PerformanceMetrics
 } from './domain';
 
+export type {
+  SessionBootstrapRequest,
+  SessionBootstrapResponse,
+  HealthResponse,
+  VersionResponse,
+  IntentMovePayload,
+  IntentChatPayload,
+  IntentActionPayload,
+  RealtimeIntentEnvelope,
+  RealtimeEventEnvelope,
+  EventAck,
+  EventStateDelta,
+  EventError,
+  EventDegraded,
+  EventVersionMismatch,
+  EventDisconnect
+} from './contracts';
+
+export {
+  sessionBootstrapRequestSchema,
+  sessionBootstrapResponseSchema,
+  healthResponseSchema,
+  versionResponseSchema,
+  intentMovePayloadSchema,
+  intentChatPayloadSchema,
+  intentActionPayloadSchema,
+  intentAckPayloadSchema,
+  handshakeAckPayloadSchema,
+  acknowledgedIntentSchema,
+  durabilityMetadataSchema,
+  realtimeIntentEnvelopeSchema,
+  realtimeEventEnvelopeSchema,
+  eventAckSchema,
+  eventStateDeltaSchema,
+  eventErrorSchema,
+  eventDegradedSchema,
+  eventVersionMismatchSchema,
+  eventDisconnectSchema,
+  realtimeIntentSchemas,
+  realtimeEventSchemas,
+  moveDirectionSchema
+} from './contracts';
+
 // API response types and client interfaces
 export type {
   ApiResponse,

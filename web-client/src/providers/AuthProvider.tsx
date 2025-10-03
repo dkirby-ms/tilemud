@@ -13,7 +13,7 @@
  * - TypeScript safety with custom auth types
  */
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import {
   PublicClientApplication,
@@ -29,76 +29,12 @@ import type {
   EndSessionRequest
 } from '@azure/msal-browser';
 import { useLogoutListener } from '../hooks/useLogoutListener';
-
-/**
- * User profile information extracted from authentication claims
- */
-export interface UserProfile {
-  /** Unique identifier from Entra ID */
-  id: string;
-  
-  /** User's display name */
-  displayName: string;
-  
-  /** User's email address */
-  email?: string;
-  
-  /** User's given name */
-  givenName?: string;
-  
-  /** User's family name */
-  familyName?: string;
-  
-  /** Additional claims from the token */
-  claims?: Record<string, unknown>;
-}
-
-/**
- * Authentication state interface
- */
-export interface AuthState {
-  /** Whether authentication is currently being processed */
-  isLoading: boolean;
-  
-  /** Whether the user is authenticated */
-  isAuthenticated: boolean;
-  
-  /** Current user profile, if authenticated */
-  user: UserProfile | null;
-  
-  /** Current authentication error, if any */
-  error: string | null;
-  
-  /** Whether the auth system has completed initialization */
-  isInitialized: boolean;
-}
-
-/**
- * Authentication actions interface
- */
-export interface AuthActions {
-  /** Initiate login flow */
-  login: () => Promise<void>;
-  
-  /** Logout the current user */
-  logout: () => Promise<void>;
-  
-  /** Get the current access token (for API calls) */
-  getAccessToken: () => Promise<string | null>;
-  
-  /** Clear any authentication errors */
-  clearError: () => void;
-}
-
-/**
- * Complete authentication context
- */
-export interface AuthContextValue extends AuthState, AuthActions {}
-
-/**
- * Authentication context - must be provided by AuthProvider
- */
-const AuthContext = createContext<AuthContextValue | null>(null);
+import {
+  AuthContext,
+  type AuthContextValue,
+  type UserProfile,
+  useAuth
+} from './authContext';
 
 /**
  * MSAL configuration based on environment variables
@@ -355,52 +291,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       {children}
     </AuthContext.Provider>
   );
-};
-
-/**
- * Hook to access authentication context
- * 
- * @returns Authentication context value
- * @throws Error if used outside AuthProvider
- */
-export const useAuth = (): AuthContextValue => {
-  const context = useContext(AuthContext);
-  
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  
-  return context;
-};
-
-/**
- * Hook to check if user is authenticated
- * 
- * Convenience hook for components that only need to know auth status.
- */
-export const useIsAuthenticated = (): boolean => {
-  const { isAuthenticated } = useAuth();
-  return isAuthenticated;
-};
-
-/**
- * Hook to get current user profile
- * 
- * Convenience hook for components that only need user data.
- */
-export const useUser = (): UserProfile | null => {
-  const { user } = useAuth();
-  return user;
-};
-
-/**
- * Hook to get authentication actions
- * 
- * Convenience hook for components that only need auth actions.
- */
-export const useAuthActions = (): Pick<AuthContextValue, 'login' | 'logout' | 'clearError'> => {
-  const { login, logout, clearError } = useAuth();
-  return { login, logout, clearError };
 };
 
 /**

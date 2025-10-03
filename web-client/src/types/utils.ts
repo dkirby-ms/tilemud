@@ -251,7 +251,7 @@ export function createErrorState<T>(error: ApiError): AsyncState<T> {
 /**
  * Utility type for extracting the data type from an AsyncState.
  */
-export type AsyncData<T extends AsyncState<any>> = T extends AsyncState<infer U> ? U : never;
+export type AsyncData<T extends AsyncState<unknown>> = T extends AsyncState<infer U> ? U : never;
 
 /**
  * Utility type for creating partial updates to domain objects.

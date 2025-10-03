@@ -38,6 +38,7 @@ export const CharacterDashboardPage: React.FC<CharacterDashboardPageProps> = ({
 
   const [showCreateForm, setShowCreateForm] = React.useState<boolean>(false);
   const [showDiagnostics, setShowDiagnostics] = React.useState<boolean>(false);
+  const diagnosticsOverlayEnabled = false; // Disabled temporarily until infinite loop issue is resolved
 
   // Load data on mount
   React.useEffect(() => {
@@ -53,7 +54,7 @@ export const CharacterDashboardPage: React.FC<CharacterDashboardPageProps> = ({
       }
     };
     loadData();
-  }, []); // Remove store functions from dependencies - they change on each render
+  }, [loadPlayer, loadArchetypeCatalog, loadServiceHealth]);
 
   // Determine if we should auto-show creation form for first-time users
   const characters = player?.characters || [];
@@ -79,17 +80,17 @@ export const CharacterDashboardPage: React.FC<CharacterDashboardPageProps> = ({
     if (result) {
       handleCharacterCreated();
     }
-  }, [handleCharacterCreated]); // Remove createCharacter from dependencies
+  }, [createCharacter, handleCharacterCreated]);
 
   // Handle character selection
   const handleSelectCharacter = React.useCallback(async (characterId: string) => {
     await selectCharacter(characterId);
-  }, []); // Remove selectCharacter from dependencies
+  }, [selectCharacter]);
 
   // Handle service health refresh
   const handleRefreshServiceHealth = React.useCallback(async () => {
     await loadServiceHealth();
-  }, []); // Remove loadServiceHealth from dependencies
+  }, [loadServiceHealth]);
 
   // Handle diagnostics toggle
   const handleToggleDiagnostics = React.useCallback((visible: boolean) => {
@@ -259,11 +260,13 @@ export const CharacterDashboardPage: React.FC<CharacterDashboardPageProps> = ({
       )}
 
       {/* Diagnostics Overlay - Disabled due to infinite loop issue */}
-      {false && <DiagnosticsOverlay
-        isVisible={showDiagnostics}
-        onToggle={handleToggleDiagnostics}
-        position="top-right"
-      />}
+      {diagnosticsOverlayEnabled ? (
+        <DiagnosticsOverlay
+          isVisible={showDiagnostics}
+          onToggle={handleToggleDiagnostics}
+          position="top-right"
+        />
+      ) : null}
     </div>
   );
 };

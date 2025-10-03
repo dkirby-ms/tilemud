@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { useCharacterStore } from '../character/state/characterStore';
 import { useFocusedDirtyGuard } from '../../hooks/useFocusedDirtyGuard';
-import { useAuthActions } from '../../providers/AuthProvider';
+import { useAuthActions } from '../../providers/authContext';
 
 /**
  * Custom hook for handling user logout with comprehensive state management.
@@ -122,7 +122,7 @@ export const useLogout = () => {
       setShowSpinner(false);
       setIsLoggingOut(false);
     }
-  }, [isLoggingOut, hasLoggedOut, characterStore, dirtyGuard]);
+  }, [authLogout, isLoggingOut, hasLoggedOut, characterStore, dirtyGuard]);
 
   return {
     logout,

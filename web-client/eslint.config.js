@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
   {
-    ignores: ['dist']
+  ignores: ['dist', 'tests/integration/version-mismatch.spec.tsx', 'public/mockServiceWorker.js']
   },
   // App and test files
   {

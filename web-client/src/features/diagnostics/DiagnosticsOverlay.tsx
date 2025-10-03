@@ -17,6 +17,16 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useCharacterStore } from '../character/state/characterStore';
 import './DiagnosticsOverlay.css';
 
+interface PerformanceMemory {
+  usedJSHeapSize: number;
+  totalJSHeapSize?: number;
+  jsHeapSizeLimit?: number;
+}
+
+type PerformanceWithMemory = Performance & {
+  memory?: PerformanceMemory;
+};
+
 interface DiagnosticsOverlayProps {
   /** Whether the overlay is visible */
   isVisible?: boolean;
@@ -114,11 +124,10 @@ const useMemoryMonitor = () => {
 
   useEffect(() => {
     const updateMemory = () => {
-      if ('memory' in performance) {
-        const memory = (performance as any).memory;
-        if (memory && memory.usedJSHeapSize) {
-          setMemoryUsage(Math.round(memory.usedJSHeapSize / 1024 / 1024)); // MB
-        }
+      const perfWithMemory = performance as PerformanceWithMemory;
+      const memory = perfWithMemory.memory;
+      if (memory && typeof memory.usedJSHeapSize === 'number') {
+        setMemoryUsage(Math.round(memory.usedJSHeapSize / 1024 / 1024)); // MB
       }
     };
 

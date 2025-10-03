@@ -15,7 +15,8 @@ import type {
   CreateCharacterResponse,
   Player,
   ServiceHealth,
-  ServiceOutage
+  ServiceOutage,
+  ValidationError
 } from '../../../types/domain';
 import type {
   GetArchetypeCatalogResponse,
@@ -27,6 +28,24 @@ import type {
   RequestConfig
 } from '../../../types/api';
 import { NetworkErrorClass, BusinessErrorClass, ServiceErrorClass } from '../../../types/errors';
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+interface ValidationErrorPayload {
+  message?: string;
+  errors: ValidationError[];
+}
+
+const isValidationErrorPayload = (value: unknown): value is ValidationErrorPayload =>
+  isRecord(value) && Array.isArray(value.errors);
+
+const isServiceOutagePayload = (value: unknown): value is ServiceOutage =>
+  isRecord(value) &&
+  typeof value.service === 'string' &&
+  typeof value.message === 'string' &&
+  'retryAfterSeconds' in value &&
+  (typeof value.retryAfterSeconds === 'number' || value.retryAfterSeconds === null);
 
 /**
  * Configuration for the API client
@@ -194,7 +213,7 @@ class HttpClient {
     }
 
     // Handle error responses
-    let errorData: any = null;
+  let errorData: unknown = null;
     
     if (contentType.includes('application/json')) {
       try {
@@ -205,7 +224,7 @@ class HttpClient {
     }
 
     // Determine error type based on status and content
-    if (response.status === 400 && errorData?.errors) {
+    if (response.status === 400 && isValidationErrorPayload(errorData)) {
       // Validation error
       throw new BusinessErrorClass(
         errorData.message || 'Validation failed',
@@ -215,12 +234,11 @@ class HttpClient {
       );
     }
 
-    if (response.status >= 500 && errorData?.service) {
+    if (response.status >= 500 && isServiceOutagePayload(errorData)) {
       // Service outage
-      const outage = errorData as ServiceOutage;
       throw new ServiceErrorClass(
-        outage.message,
-        outage,
+        errorData.message,
+        errorData,
         ['character-creation', 'character-selection']
       );
     }
@@ -299,7 +317,7 @@ export class CharacterServiceApiClient implements CharacterServiceClient {
    * Select an active character
    */
   async selectCharacter(characterId: string): Promise<SelectCharacterResponse> {
-    await this.httpClient.request<void>({
+    await this.httpClient.request<undefined>({
       method: 'POST',
       url: `/api/players/me/characters/${encodeURIComponent(characterId)}/select`
     });

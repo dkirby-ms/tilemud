@@ -1,5 +1,25 @@
 import { describe, it, expect } from 'vitest';
 
+const asRecord = (value: unknown): Record<string, unknown> => {
+  expect(typeof value).toBe('object');
+  expect(value).not.toBeNull();
+  return value as Record<string, unknown>;
+};
+
+const expectStringProperty = (record: Record<string, unknown>, key: string): string => {
+  expect(record).toHaveProperty(key);
+  const value = record[key];
+  expect(typeof value).toBe('string');
+  return value as string;
+};
+
+const expectBooleanProperty = (record: Record<string, unknown>, key: string): boolean => {
+  expect(record).toHaveProperty(key);
+  const value = record[key];
+  expect(typeof value).toBe('boolean');
+  return value as boolean;
+};
+
 /**
  * Contract test for GET /api/catalog/archetypes
  * 
@@ -26,39 +46,41 @@ describe('Contract: GET /api/catalog/archetypes', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toMatch(/application\/json/);
 
-    const data = await response.json();
+    const data: unknown = await response.json();
+    const catalog = asRecord(data);
 
-    // Validate ArchetypeCatalogResponse schema
-    expect(data).toHaveProperty('version');
-    expect(typeof data.version).toBe('string');
-    expect(data.version).toMatch(/^\d+\.\d+\.\d+$/); // Semantic version pattern
+    const version = expectStringProperty(catalog, 'version');
+    expect(version).toMatch(/^\d+\.\d+\.\d+$/); // Semantic version pattern
 
-    expect(data).toHaveProperty('archetypes');
-    expect(Array.isArray(data.archetypes)).toBe(true);
+    const archetypesValue = catalog.archetypes;
+    expect(Array.isArray(archetypesValue)).toBe(true);
+    const archetypes = Array.isArray(archetypesValue) ? archetypesValue : [];
 
     // Validate each Archetype in the array
-    data.archetypes.forEach((archetype: any) => {
-      // Required properties
-      expect(archetype).toHaveProperty('id');
-      expect(typeof archetype.id).toBe('string');
-      expect(archetype.id).toBeTruthy(); // Non-empty string
+    archetypes.forEach((entry) => {
+      const archetype = asRecord(entry);
 
-      expect(archetype).toHaveProperty('name');
-      expect(typeof archetype.name).toBe('string');
-      expect(archetype.name).toBeTruthy(); // Non-empty string
+      const id = expectStringProperty(archetype, 'id');
+      expect(id).toBeTruthy(); // Non-empty string
 
-      expect(archetype).toHaveProperty('isAvailable');
-      expect(typeof archetype.isAvailable).toBe('boolean');
+      const name = expectStringProperty(archetype, 'name');
+      expect(name).toBeTruthy(); // Non-empty string
+
+      expectBooleanProperty(archetype, 'isAvailable');
 
       // Optional properties (validate if present)
-      if (archetype.description !== undefined) {
-        expect(typeof archetype.description).toBe('string');
+      if ('description' in archetype && archetype.description !== undefined) {
+        const { description } = archetype;
+        expect(typeof description).toBe('string');
       }
 
-      if (archetype.lastUpdatedAt !== undefined) {
-        expect(typeof archetype.lastUpdatedAt).toBe('string');
+      if ('lastUpdatedAt' in archetype && archetype.lastUpdatedAt !== undefined) {
+        const { lastUpdatedAt } = archetype;
+        expect(typeof lastUpdatedAt).toBe('string');
         // Validate ISO 8601 date-time format
-        expect(archetype.lastUpdatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/);
+        if (typeof lastUpdatedAt === 'string') {
+          expect(lastUpdatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/);
+        }
       }
     });
   });
@@ -75,19 +97,22 @@ describe('Contract: GET /api/catalog/archetypes', () => {
     if (response.status === 503) {
       expect(response.headers.get('content-type')).toMatch(/application\/json/);
 
-      const data = await response.json();
+      const data: unknown = await response.json();
+      const outage = asRecord(data);
 
       // Validate OutageNotice schema
-      expect(data).toHaveProperty('service');
-      expect(data.service).toBe('character-service');
+      const service = expectStringProperty(outage, 'service');
+      expect(service).toBe('character-service');
 
-      expect(data).toHaveProperty('message');
-      expect(typeof data.message).toBe('string');
-      expect(data.message).toBeTruthy();
+      const message = expectStringProperty(outage, 'message');
+      expect(message).toBeTruthy();
 
-      if (data.retryAfterSeconds !== null) {
-        expect(typeof data.retryAfterSeconds).toBe('number');
-        expect(data.retryAfterSeconds).toBeGreaterThanOrEqual(0);
+      if ('retryAfterSeconds' in outage && outage.retryAfterSeconds !== null) {
+        const retryAfterSeconds = outage.retryAfterSeconds;
+        expect(typeof retryAfterSeconds).toBe('number');
+        if (typeof retryAfterSeconds === 'number') {
+          expect(retryAfterSeconds).toBeGreaterThanOrEqual(0);
+        }
       }
     }
   });

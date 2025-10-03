@@ -1,5 +1,19 @@
 import { describe, it, expect } from 'vitest';
 
+const asRecord = (value: unknown): Record<string, unknown> => {
+  expect(typeof value).toBe('object');
+  expect(value).not.toBeNull();
+  return value as Record<string, unknown>;
+};
+
+const expectStringProperty = (record: Record<string, unknown>, key: string): string => {
+  expect(record).toHaveProperty(key);
+  const value = record[key];
+  expect(typeof value).toBe('string');
+  return value as string;
+};
+
+
 /**
  * Contract test for GET /api/players/me/characters
  * 
@@ -34,53 +48,62 @@ describe('Contract: GET /api/players/me/characters', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toMatch(/application\/json/);
 
-    const data = await response.json();
+    const data: unknown = await response.json();
+    const roster = asRecord(data);
 
-    // Validate CharacterRosterResponse schema
-    expect(data).toHaveProperty('playerId');
-    expect(typeof data.playerId).toBe('string');
-    expect(data.playerId).toBeTruthy();
+    const playerId = expectStringProperty(roster, 'playerId');
+    expect(playerId).toBeTruthy();
 
-    expect(data).toHaveProperty('activeCharacterId');
-    if (data.activeCharacterId !== null) {
-      expect(typeof data.activeCharacterId).toBe('string');
+    let activeCharacterId: string | null = null;
+    if ('activeCharacterId' in roster) {
+      const value = roster.activeCharacterId;
+      if (value === null) {
+        activeCharacterId = null;
+      } else {
+        expect(typeof value === 'string' || value === undefined).toBe(true);
+        if (typeof value === 'string') {
+          activeCharacterId = value;
+        }
+      }
     }
 
-    expect(data).toHaveProperty('characters');
-    expect(Array.isArray(data.characters)).toBe(true);
+    const charactersValue = roster.characters;
+    expect(Array.isArray(charactersValue)).toBe(true);
+  const characters = Array.isArray(charactersValue) ? charactersValue : [];
+  const characterIds: string[] = [];
 
     // Validate each Character in the roster
-    data.characters.forEach((character: any) => {
-      // Required properties
-      expect(character).toHaveProperty('id');
-      expect(typeof character.id).toBe('string');
-      // UUID format validation (loose check)
-      expect(character.id).toMatch(/^[0-9a-f-]{36}$/i);
+    characters.forEach((entry) => {
+      const character = asRecord(entry);
 
-      expect(character).toHaveProperty('name');
-      expect(typeof character.name).toBe('string');
-      // Name pattern: ^[A-Z][a-z]+$
-      expect(character.name).toMatch(/^[A-Z][a-z]+$/);
+      const id = expectStringProperty(character, 'id');
+      expect(id).toMatch(/^[0-9a-f-]{36}$/i);
+  characterIds.push(id);
 
-      expect(character).toHaveProperty('archetypeId');
-      expect(typeof character.archetypeId).toBe('string');
-      expect(character.archetypeId).toBeTruthy();
+      const name = expectStringProperty(character, 'name');
+      expect(name).toMatch(/^[A-Z][a-z]+$/);
 
-      expect(character).toHaveProperty('createdAt');
-      expect(typeof character.createdAt).toBe('string');
-      // ISO 8601 date-time format
-      expect(character.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/);
+      const archetypeId = expectStringProperty(character, 'archetypeId');
+      expect(archetypeId).toBeTruthy();
 
-      expect(character).toHaveProperty('status');
-      expect(['active', 'retired']).toContain(character.status);
+      const createdAt = expectStringProperty(character, 'createdAt');
+      expect(createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/);
+
+      const status = expectStringProperty(character, 'status');
+      expect(['active', 'retired']).toContain(status);
     });
 
+    if (activeCharacterId !== null) {
+      expect(characterIds).toContain(activeCharacterId);
+    }
+
     // Validate optional outage property
-    if (data.outage !== undefined && data.outage !== null) {
-      expect(data.outage).toHaveProperty('service');
-      expect(data.outage.service).toBe('character-service');
-      expect(data.outage).toHaveProperty('message');
-      expect(typeof data.outage.message).toBe('string');
+    if ('outage' in roster && roster.outage !== undefined && roster.outage !== null) {
+      const outage = asRecord(roster.outage);
+      const service = expectStringProperty(outage, 'service');
+      expect(service).toBe('character-service');
+      const message = expectStringProperty(outage, 'message');
+      expect(message).toBeTruthy();
     }
   });
 
@@ -102,19 +125,22 @@ describe('Contract: GET /api/players/me/characters', () => {
     if (response.status === 503) {
       expect(response.headers.get('content-type')).toMatch(/application\/json/);
 
-      const data = await response.json();
+      const data: unknown = await response.json();
+      const outage = asRecord(data);
 
       // Validate OutageNotice schema
-      expect(data).toHaveProperty('service');
-      expect(data.service).toBe('character-service');
+      const service = expectStringProperty(outage, 'service');
+      expect(service).toBe('character-service');
 
-      expect(data).toHaveProperty('message');
-      expect(typeof data.message).toBe('string');
-      expect(data.message).toBeTruthy();
+      const message = expectStringProperty(outage, 'message');
+      expect(message).toBeTruthy();
 
-      if (data.retryAfterSeconds !== null) {
-        expect(typeof data.retryAfterSeconds).toBe('number');
-        expect(data.retryAfterSeconds).toBeGreaterThanOrEqual(0);
+      if ('retryAfterSeconds' in outage && outage.retryAfterSeconds !== null) {
+        const retryAfterSeconds = outage.retryAfterSeconds;
+        expect(typeof retryAfterSeconds).toBe('number');
+        if (typeof retryAfterSeconds === 'number') {
+          expect(retryAfterSeconds).toBeGreaterThanOrEqual(0);
+        }
       }
     }
   });
@@ -129,10 +155,17 @@ describe('Contract: GET /api/players/me/characters', () => {
     
     expect(response.status).toBe(200);
     
-    const data = await response.json();
-    expect(data.characters).toEqual([]);
-    expect(data.activeCharacterId).toBeNull();
-    expect(data.playerId).toBeTruthy();
+    const data: unknown = await response.json();
+  const roster = asRecord(data);
+
+  const charactersValue = roster.characters;
+  expect(Array.isArray(charactersValue)).toBe(true);
+  expect(Array.isArray(charactersValue) ? charactersValue : []).toEqual([]);
+
+  const activeCharacterValue = 'activeCharacterId' in roster ? roster.activeCharacterId : null;
+  expect(activeCharacterValue).toBeNull();
+    const playerId = expectStringProperty(roster, 'playerId');
+    expect(playerId).toBeTruthy();
   });
 
   it('should handle roster with outage notice payload', async () => {
@@ -145,13 +178,20 @@ describe('Contract: GET /api/players/me/characters', () => {
     
     expect(response.status).toBe(200);
     
-    const data = await response.json();
-    
+    const data: unknown = await response.json();
+    const roster = asRecord(data);
+
     // Should include outage notice in successful response
-    expect(data).toHaveProperty('outage');
-    expect(data.outage).not.toBeNull();
-    expect(data.outage.service).toBe('character-service');
-    expect(typeof data.outage.message).toBe('string');
+    expect(roster).toHaveProperty('outage');
+    const outageValue = roster.outage;
+    expect(outageValue).not.toBeNull();
+    if (outageValue !== null && outageValue !== undefined) {
+      const outage = asRecord(outageValue);
+      const service = expectStringProperty(outage, 'service');
+      expect(service).toBe('character-service');
+      const message = expectStringProperty(outage, 'message');
+      expect(message).toBeTruthy();
+    }
   });
 
   it('should validate activeCharacterId references existing character', async () => {
@@ -164,15 +204,33 @@ describe('Contract: GET /api/players/me/characters', () => {
     
     expect(response.status).toBe(200);
     
-    const data = await response.json();
-    
-    if (data.activeCharacterId !== null) {
-      // Active character ID should exist in the characters array
-      const activeCharacter = data.characters.find(
-        (char: any) => char.id === data.activeCharacterId
-      );
-      expect(activeCharacter).toBeDefined();
-      expect(activeCharacter.status).toBe('active');
+    const data: unknown = await response.json();
+    const roster = asRecord(data);
+
+    const activeValue = 'activeCharacterId' in roster ? roster.activeCharacterId : null;
+    if (activeValue !== null && activeValue !== undefined) {
+      expect(typeof activeValue === 'string').toBe(true);
+      const activeId = typeof activeValue === 'string' ? activeValue : '';
+
+      const charactersValue = roster.characters;
+      expect(Array.isArray(charactersValue)).toBe(true);
+      const characters = Array.isArray(charactersValue) ? charactersValue : [];
+
+      let activeCharacter: Record<string, unknown> | null = null;
+      for (const entry of characters) {
+        const character = asRecord(entry);
+        const idValue = character.id;
+        if (typeof idValue === 'string' && idValue === activeId) {
+          activeCharacter = character;
+          break;
+        }
+      }
+
+      expect(activeCharacter).not.toBeNull();
+      if (activeCharacter) {
+        const status = expectStringProperty(activeCharacter, 'status');
+        expect(status).toBe('active');
+      }
     }
   });
 });

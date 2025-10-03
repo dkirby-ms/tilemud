@@ -238,12 +238,12 @@ export interface CharacterServiceClient {
  */
 export interface ApiEndpoints {
   'GET /api/catalog/archetypes': {
-    request: void;
+    request: undefined;
     response: ArchetypeCatalog;
   };
   
   'GET /api/players/me/characters': {
-    request: void;
+    request: undefined;
     response: Player;
   };
   
@@ -253,12 +253,12 @@ export interface ApiEndpoints {
   };
   
   'POST /api/players/me/characters/{characterId}/select': {
-    request: void;
+    request: undefined;
     response: null;
   };
   
   'GET /api/service-health/character': {
-    request: void;
+    request: undefined;
     response: ServiceHealth;
   };
 }
