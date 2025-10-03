@@ -55,7 +55,8 @@ const durabilityMetadataSchema = z
   .object({
     persisted: z.boolean(),
     actionEventId: z.string().min(1),
-    persistedAt: isoDateString()
+    persistedAt: isoDateString(),
+    duplicate: z.boolean().optional()
   })
   .strict();
 
@@ -63,7 +64,7 @@ const intentAckPayloadSchema = z
   .object({
     intentType: z.string().min(1),
     sequence: sequenceNumberSchema,
-    status: z.enum(["applied", "rejected", "queued"]),
+    status: z.enum(["applied", "duplicate", "rejected", "queued"]),
     acknowledgedAt: isoDateString(),
     durability: durabilityMetadataSchema.optional(),
     latencyMs: z.number().nonnegative().optional(),

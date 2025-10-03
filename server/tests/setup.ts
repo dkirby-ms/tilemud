@@ -1,6 +1,8 @@
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from "vitest";
 
 const baselineEnv = { ...process.env };
+const originalProcessSend = process.send;
+const stubProcessSend = ((..._args: Parameters<NonNullable<typeof process.send>>) => true) as typeof process.send;
 
 const restoreEnv = () => {
   for (const key of Object.keys(process.env)) {
@@ -20,19 +22,23 @@ const ensureDefaults = () => {
 beforeAll(() => {
   restoreEnv();
   ensureDefaults();
+  process.send = stubProcessSend;
 });
 
 beforeEach(() => {
   restoreEnv();
   ensureDefaults();
+  process.send = stubProcessSend;
 });
 
 afterEach(() => {
   restoreEnv();
+  process.send = stubProcessSend;
 });
 
 afterAll(() => {
   restoreEnv();
+  process.send = originalProcessSend;
 });
 
 vi.mock("pino", () => {

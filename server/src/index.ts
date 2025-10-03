@@ -5,6 +5,7 @@ import { createApp } from "./api/app.js";
 import { getAppLogger } from "./logging/logger.js";
 import { initializeContainer, shutdownContainer } from "./infra/container.js";
 import type { BattleRoomDependencies } from "./rooms/BattleRoom.js";
+import type { GameRoomDependencies } from "./rooms/GameRoom.js";
 import { registerRooms } from "./rooms/registerRooms.js";
 import { runMigrations } from "./scripts/run-migrations.js";
 
@@ -47,10 +48,25 @@ export async function start(): Promise<StartedServer> {
     reconnectService: container.reconnectService,
     messageService: container.messageService,
     ruleSetService: container.ruleSetService,
-  logger: logger.child?.({ scope: "BattleRoom" }) ?? logger,
+    logger: logger.child?.({ scope: "BattleRoom" }) ?? logger,
     now: () => Date.now(),
     defaultGracePeriodMs: 60_000
   } satisfies BattleRoomDependencies;
+
+  const gameRoomDependencies: GameRoomDependencies = {
+    sessions: container.playerSessionStore,
+    characterProfiles: container.characterProfileRepository,
+    metrics: container.metricsService,
+    versionService: container.versionService,
+    sequenceService: container.actionSequenceService,
+    durabilityService: container.actionDurabilityService,
+    rateLimiter: container.rateLimiter,
+    reconnectService: container.reconnectService,
+    reconnectTokens: container.reconnectTokenStore,
+    degradedSignalService: container.degradedSignalService,
+    logger: logger.child?.({ scope: "GameRoom" }) ?? logger,
+    now: () => new Date()
+  } satisfies GameRoomDependencies;
 
   try {
     await registerRooms({
@@ -58,6 +74,9 @@ export async function start(): Promise<StartedServer> {
       ruleSetService: container.ruleSetService,
       battleRoom: {
         dependencies: battleRoomDependencies
+      },
+      gameRoom: {
+        dependencies: gameRoomDependencies
       },
       logger
     });

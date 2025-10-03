@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Server } from "colyseus";
 import { BattleRoom, type BattleRoomDependencies } from "./BattleRoom.js";
 import { LobbyRoom, type LobbyRoomDependencies } from "./LobbyRoom.js";
+import { GameRoom, type GameRoomDependencies } from "./GameRoom.js";
 import type { RuleSetService } from "@@/services/rulesetService.js";
 
 interface LoggerLike {
@@ -14,6 +15,10 @@ interface LoggerLike {
 export interface RegisterRoomsOptions {
   gameServer: Pick<Server, "define">;
   ruleSetService: Pick<RuleSetService, "getLatestRuleSet">;
+  gameRoom: {
+    name?: string;
+    dependencies: GameRoomDependencies;
+  };
   battleRoom: {
     name?: string;
     dependencies: BattleRoomDependencies;
@@ -27,25 +32,32 @@ export interface RegisterRoomsOptions {
 }
 
 export interface RegisterRoomsResult {
+  gameRoomName: string;
   battleRoomName: string;
   lobbyRoomName: string;
   defaultRulesetVersion: string;
 }
 
 type NormalizedBattleDependencies = BattleRoomDependencies & Required<Pick<BattleRoomDependencies, "logger" | "now" | "defaultGracePeriodMs">>;
+type NormalizedGameDependencies = GameRoomDependencies & Required<Pick<GameRoomDependencies, "logger">> & { now: () => Date };
 
 type RuleSetServiceWithLatest = Pick<RuleSetService, "getLatestRuleSet">;
 
 type LobbyDependencyOverrides = Omit<LobbyRoomDependencies, "battleRoomServices"> | undefined;
 
 export async function registerRooms(options: RegisterRoomsOptions): Promise<RegisterRoomsResult> {
+  if (!options.gameRoom?.dependencies) {
+    throw new Error("Game room dependencies are required");
+  }
   if (!options.battleRoom?.dependencies) {
     throw new Error("Battle room dependencies are required");
   }
 
+  const gameRoomName = options.gameRoom.name?.trim().length ? options.gameRoom.name.trim() : "game";
   const battleRoomName = options.battleRoom.name?.trim().length ? options.battleRoom.name.trim() : "battle";
   const lobbyRoomName = options.lobby?.name?.trim().length ? options.lobby.name.trim() : "lobby";
 
+  const normalizedGameDeps = normalizeGameDependencies(options.gameRoom.dependencies, options.logger);
   const normalizedBattleDeps = normalizeBattleDependencies(options.battleRoom.dependencies, options.logger);
 
   const defaultRulesetVersion = await resolveDefaultRulesetVersion(
@@ -60,6 +72,9 @@ export async function registerRooms(options: RegisterRoomsOptions): Promise<Regi
     battleRoomName
   );
 
+  options.gameServer.define(gameRoomName, GameRoom, {
+    services: normalizedGameDeps
+  });
   options.gameServer.define(battleRoomName, BattleRoom);
 
   options.gameServer.define(lobbyRoomName, LobbyRoom, {
@@ -68,6 +83,7 @@ export async function registerRooms(options: RegisterRoomsOptions): Promise<Regi
   });
 
   return {
+    gameRoomName,
     battleRoomName,
     lobbyRoomName,
     defaultRulesetVersion
@@ -96,7 +112,7 @@ async function resolveDefaultRulesetVersion(
 
   const latest = await ruleSetService.getLatestRuleSet();
   if (!latest) {
-    throw new Error("Unable to determine default ruleset version for lobby room registration");
+    return "0.0.0-dev";
   }
 
   return latest.version;
@@ -124,4 +140,15 @@ function buildLobbyDependencies(
   }
 
   return dependencies;
+}
+
+function normalizeGameDependencies(
+  dependencies: GameRoomDependencies,
+  fallbackLogger?: LoggerLike
+): NormalizedGameDependencies {
+  return {
+    ...dependencies,
+    logger: dependencies.logger ?? fallbackLogger ?? console,
+    now: dependencies.now ?? (() => new Date())
+  } satisfies NormalizedGameDependencies;
 }

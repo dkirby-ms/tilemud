@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS character_profiles (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+LOCK TABLE character_profiles IN ACCESS EXCLUSIVE MODE;
+
 CREATE INDEX IF NOT EXISTS character_profiles_user_id_idx ON character_profiles (user_id);
 
 CREATE TABLE IF NOT EXISTS action_events (
@@ -27,6 +29,19 @@ CREATE TABLE IF NOT EXISTS action_events (
     payload_json JSONB NOT NULL DEFAULT '{}'::jsonb,
     persisted_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+LOCK TABLE action_events IN ACCESS EXCLUSIVE MODE;
+
+-- Backfill / align schema when action_events existed before this migration ran
+ALTER TABLE action_events
+    ADD COLUMN IF NOT EXISTS session_id UUID;
+
+UPDATE action_events
+SET session_id = uuid_generate_v4()
+WHERE session_id IS NULL;
+
+ALTER TABLE action_events
+    ALTER COLUMN session_id SET NOT NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS action_events_session_sequence_idx ON action_events (session_id, sequence_number);
 CREATE INDEX IF NOT EXISTS action_events_character_sequence_idx ON action_events (character_id, sequence_number DESC);

@@ -16,6 +16,12 @@ import { createCharacterProfileRepository, CharacterProfileRepository } from "..
 import { PlayerSessionStore } from "../models/playerSession.js";
 import { createInMemoryReconnectTokenStore, ReconnectTokenStore } from "../models/reconnectToken.js";
 import { SessionBootstrapService } from "../services/sessionBootstrapService.js";
+import { createActionEventRepository, ActionEventRepository } from "../models/actionEvent.js";
+import { ActionDurabilityService } from "../services/actionDurabilityService.js";
+import { ActionSequenceService } from "../services/actionSequenceService.js";
+import { MetricsService } from "../services/metricsService.js";
+import { DegradedSignalService } from "../services/degradedSignalService.js";
+import { VersionService } from "../services/versionService.js";
 import type { Pool } from "pg";
 import type { RedisClientType } from "redis";
 import { getAppLogger, type AppLogger } from "../logging/logger.js";
@@ -41,6 +47,12 @@ export interface Container {
   playerSessionStore: PlayerSessionStore;
   reconnectTokenStore: ReconnectTokenStore;
   sessionBootstrapService: SessionBootstrapService;
+  actionEventRepository: ActionEventRepository;
+  actionDurabilityService: ActionDurabilityService;
+  actionSequenceService: ActionSequenceService;
+  metricsService: MetricsService;
+  degradedSignalService: DegradedSignalService;
+  versionService: VersionService;
   logger: AppLogger;
 }
 
@@ -79,10 +91,18 @@ export async function initializeContainer(): Promise<Container> {
   const characterProfileRepository = createCharacterProfileRepository(postgres);
   const playerSessionStore = new PlayerSessionStore();
   const reconnectTokenStore = createInMemoryReconnectTokenStore();
+  const actionEventRepository = createActionEventRepository(postgres);
+  const actionDurabilityService = new ActionDurabilityService({ repository: actionEventRepository });
+  const actionSequenceService = new ActionSequenceService(playerSessionStore);
+  const metricsService = new MetricsService();
+  const degradedSignalService = new DegradedSignalService({ dependencies: ["redis", "postgres", "metrics"] });
+  const versionService = new VersionService();
   const sessionBootstrapService = new SessionBootstrapService({
     characterProfiles: characterProfileRepository,
     playerSessions: playerSessionStore,
-    reconnectTokens: reconnectTokenStore
+    reconnectTokens: reconnectTokenStore,
+    defaultRoomName: "game",
+    buildVersion: versionService.getVersionInfo().version
   });
 
   container = {
@@ -106,6 +126,12 @@ export async function initializeContainer(): Promise<Container> {
     playerSessionStore,
     reconnectTokenStore,
     sessionBootstrapService,
+    actionEventRepository,
+    actionDurabilityService,
+    actionSequenceService,
+    metricsService,
+    degradedSignalService,
+    versionService,
     logger,
   };
 

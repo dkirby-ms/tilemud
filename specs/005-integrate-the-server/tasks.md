@@ -94,9 +94,9 @@
 
 ## Phase 3.5: Endpoints & Real-time Room Implementation
 - [X] T041 Implement POST /api/session/bootstrap Express handler `server/src/api/sessionBootstrap.ts`
-- [ ] T042 Implement GET /api/health Express handler `server/src/api/health.ts`
-- [ ] T043 Implement GET /api/version Express handler `server/src/api/version.ts`
-- [ ] T044 Implement Colyseus room for player sessions `server/src/rooms/GameRoom.ts` (handshake, join, broadcast deltas)
+- [X] T042 Implement GET /api/health Express handler `server/src/api/health.ts`
+- [X] T043 Implement GET /api/version Express handler `server/src/api/version.ts`
+- [X] T044 Implement Colyseus room for player sessions `server/src/rooms/GameRoom.ts` (handshake, join, broadcast deltas)
 - [ ] T045 Implement real-time intent handlers (move/chat/action) in `server/src/actions/intentHandlers.ts`
 - [ ] T046 Integrate durability + sequencing in room pipeline `server/src/rooms/GameRoom.ts` (persist before ack)
 - [ ] T047 Implement version mismatch disconnect logic `server/src/rooms/versionMismatchGuard.ts`
