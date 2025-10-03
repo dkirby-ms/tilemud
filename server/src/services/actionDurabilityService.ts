@@ -5,6 +5,8 @@ import type {
 } from "../models/actionEvent.js";
 import { ActionEventPersistenceError } from "../models/actionEvent.js";
 import { TileMudError } from "../models/errorCodes.js";
+import { getAppLogger, type AppLogger } from "../logging/logger.js";
+import type { DbOutageGuard } from "./dbOutageGuard.js";
 
 export interface PersistActionInput extends AppendActionEventInput {
   actionIdHint?: string;
@@ -24,16 +26,25 @@ export interface PersistActionResult {
 
 export interface ActionDurabilityServiceDependencies {
   repository: ActionEventRepository;
+  logger?: AppLogger;
+  outageGuard?: DbOutageGuard;
 }
 
 export class ActionDurabilityService {
   private readonly repository: ActionEventRepository;
+  private readonly logger: AppLogger;
+  private readonly outageGuard?: DbOutageGuard;
 
   constructor(dependencies: ActionDurabilityServiceDependencies) {
     this.repository = dependencies.repository;
+    const rootLogger = dependencies.logger ?? getAppLogger();
+    this.logger = rootLogger.child?.({ module: "actionDurabilityService" }) ?? rootLogger;
+    this.outageGuard = dependencies.outageGuard;
   }
 
   async persistAction(input: PersistActionInput): Promise<PersistActionResult> {
+    this.outageGuard?.assertAvailable();
+
     try {
       const record = await this.repository.appendAction({
         sessionId: input.sessionId,
@@ -42,6 +53,13 @@ export class ActionDurabilityService {
         sequenceNumber: input.sequenceNumber,
         actionType: input.actionType,
         payload: input.payload
+      });
+
+      this.outageGuard?.recordSuccess();
+      this.logger.debug?.("action_durability.persist.success", {
+        sessionId: input.sessionId,
+        sequenceNumber: input.sequenceNumber,
+        actionType: input.actionType
       });
 
       return {
@@ -56,11 +74,25 @@ export class ActionDurabilityService {
         );
 
         if (duplicate) {
+          this.outageGuard?.recordSuccess();
+          this.logger.info?.("action_durability.persist.duplicate", {
+            sessionId: input.sessionId,
+            sequenceNumber: input.sequenceNumber,
+            actionType: input.actionType
+          });
           return {
             record: duplicate,
             metadata: createDurabilityMetadata(duplicate, true)
           } satisfies PersistActionResult;
         }
+
+        this.outageGuard?.recordFailure(error);
+        this.logger.error?.("action_durability.persist.persistence_error", {
+          sessionId: input.sessionId,
+          sequenceNumber: input.sequenceNumber,
+          actionType: input.actionType,
+          error: error.message
+        });
 
         throw new TileMudError("INTERNAL_ERROR", {
           message: "Failed to persist action event",
@@ -69,6 +101,14 @@ export class ActionDurabilityService {
           cause: error.message
         });
       }
+
+      this.outageGuard?.recordFailure(error);
+      this.logger.error?.("action_durability.persist.unhandled_error", {
+        sessionId: input.sessionId,
+        sequenceNumber: input.sequenceNumber,
+        actionType: input.actionType,
+        error: error instanceof Error ? error.message : String(error)
+      });
 
       throw error;
     }

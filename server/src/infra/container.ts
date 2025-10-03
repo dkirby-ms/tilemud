@@ -21,6 +21,7 @@ import { ActionDurabilityService } from "../services/actionDurabilityService.js"
 import { ActionSequenceService } from "../services/actionSequenceService.js";
 import { MetricsService } from "../services/metricsService.js";
 import { DegradedSignalService } from "../services/degradedSignalService.js";
+import { DbOutageGuard } from "../services/dbOutageGuard.js";
 import { VersionService } from "../services/versionService.js";
 import { InactivityTimeoutService } from "../services/inactivityTimeoutService.js";
 import type { Pool } from "pg";
@@ -53,6 +54,7 @@ export interface Container {
   actionSequenceService: ActionSequenceService;
   metricsService: MetricsService;
   degradedSignalService: DegradedSignalService;
+  dbOutageGuard: DbOutageGuard;
   versionService: VersionService;
   inactivityTimeoutService: InactivityTimeoutService;
   logger: AppLogger;
@@ -85,19 +87,31 @@ export async function initializeContainer(): Promise<Container> {
   const battleOutcomeRepository = createBattleOutcomeRepository(postgres);
   const outcomeService = new OutcomeService({ repository: battleOutcomeRepository });
   const ruleSetService = new RuleSetService({ repository: ruleSetRepository });
-  const reconnectService = new ReconnectService({
-    redis,
-    defaultGracePeriodMs: 60_000
-  });
   const actionPipeline = new ActionPipeline({ rateLimiter });
   const characterProfileRepository = createCharacterProfileRepository(postgres);
   const playerSessionStore = new PlayerSessionStore();
   const reconnectTokenStore = createInMemoryReconnectTokenStore();
   const actionEventRepository = createActionEventRepository(postgres);
-  const actionDurabilityService = new ActionDurabilityService({ repository: actionEventRepository });
-  const actionSequenceService = new ActionSequenceService(playerSessionStore);
   const metricsService = new MetricsService();
   const degradedSignalService = new DegradedSignalService({ dependencies: ["redis", "postgres", "metrics"] });
+  const dbOutageGuard = new DbOutageGuard({
+    degradedSignalService,
+    logger
+  });
+  const reconnectService = new ReconnectService({
+    redis,
+    defaultGracePeriodMs: 60_000,
+    metrics: metricsService,
+    logger
+  });
+  const actionSequenceService = new ActionSequenceService(playerSessionStore, {
+    metrics: metricsService
+  });
+  const actionDurabilityService = new ActionDurabilityService({
+    repository: actionEventRepository,
+    logger,
+    outageGuard: dbOutageGuard
+  });
   const versionService = new VersionService();
   const inactivityTimeoutService = new InactivityTimeoutService({
     sessions: playerSessionStore,
@@ -109,7 +123,9 @@ export async function initializeContainer(): Promise<Container> {
     playerSessions: playerSessionStore,
     reconnectTokens: reconnectTokenStore,
     defaultRoomName: "game",
-    buildVersion: versionService.getVersionInfo().version
+    buildVersion: versionService.getVersionInfo().version,
+    metrics: metricsService,
+    logger
   });
 
   container = {
@@ -138,6 +154,7 @@ export async function initializeContainer(): Promise<Container> {
     actionSequenceService,
     metricsService,
     degradedSignalService,
+    dbOutageGuard,
     versionService,
     inactivityTimeoutService,
     logger,

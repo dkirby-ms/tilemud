@@ -104,13 +104,13 @@
 - [X] T049 Implement Redis degraded event broadcast hook in `server/src/rooms/degradedEmitter.ts`
 
 ## Phase 3.6: Frontend Integration
-- [ ] T050 Implement session store (status, sequence) in `web-client/src/features/session/sessionStore.ts`
-- [ ] T051 Implement WebSocket/Colyseus client connector in `web-client/src/features/session/colyseusClient.ts`
-- [ ] T052 Implement version mismatch UI handling component in `web-client/src/components/VersionMismatchBanner.tsx`
-- [ ] T053 Implement reconnect / degraded state overlays in `web-client/src/components/ConnectionStatusOverlay.tsx`
-- [ ] T054 Implement state delta reducer & application logic in `web-client/src/features/state/stateReducer.ts`
-- [ ] T055 Wire movement input dispatch (intent.move) in `web-client/src/features/movement/movementController.ts`
-- [ ] T056 Wire chat input dispatch (intent.chat) in `web-client/src/features/chat/chatController.ts`
+- [X] T050 Implement session store (status, sequence) in `web-client/src/features/session/sessionStore.ts`
+- [X] T051 Implement WebSocket/Colyseus client connector in `web-client/src/features/session/colyseusClient.ts`
+- [X] T052 Implement version mismatch UI handling component in `web-client/src/components/VersionMismatchBanner.tsx`
+- [X] T053 Implement reconnect / degraded state overlays in `web-client/src/components/ConnectionStatusOverlay.tsx`
+- [X] T054 Implement state delta reducer & application logic in `web-client/src/features/state/stateReducer.ts`
+- [X] T055 Wire movement input dispatch (intent.move) in `web-client/src/features/movement/movementController.ts`
+- [X] T056 Wire chat input dispatch (intent.chat) in `web-client/src/features/chat/chatController.ts`
 
 ## Phase 3.7: Integration Wiring & Cross-Cutting Concerns
 - [ ] T057 Wire metrics emission where instrumentation points exist (connect, action ack) in existing service & room files

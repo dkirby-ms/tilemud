@@ -1,4 +1,5 @@
 import type { PlayerSessionState, PlayerSessionStore } from "../models/playerSession.js";
+import type { MetricsService } from "./metricsService.js";
 
 export type SequenceStatus =
   | "accept"
@@ -81,14 +82,40 @@ export interface AcknowledgeSequenceInput {
   sequence: number;
 }
 
+export interface ActionSequenceServiceOptions {
+  metrics?: MetricsService;
+  now?: () => Date;
+  pendingSnapshotTtlMs?: number;
+}
+
+const DEFAULT_PENDING_SNAPSHOT_TTL_MS = 60_000;
+
+interface PendingSnapshotEntry {
+  result: SequenceGapResult | SequenceMissingSessionResult;
+  scheduledAt: Date;
+}
+
 export class ActionSequenceService {
-  constructor(private readonly sessions: PlayerSessionStore) {}
+  private readonly sessions: PlayerSessionStore;
+  private readonly metrics?: MetricsService;
+  private readonly now: () => Date;
+  private readonly pendingSnapshotTtlMs: number;
+  private readonly pendingSnapshots = new Map<string, PendingSnapshotEntry>();
+
+  constructor(sessions: PlayerSessionStore, options: ActionSequenceServiceOptions = {}) {
+    this.sessions = sessions;
+    this.metrics = options.metrics;
+    this.now = options.now ?? (() => new Date());
+    this.pendingSnapshotTtlMs = Math.max(1_000, options.pendingSnapshotTtlMs ?? DEFAULT_PENDING_SNAPSHOT_TTL_MS);
+  }
 
   evaluate(input: EvaluateSequenceInput): SequenceEvaluationResult {
     const session = this.sessions.get(input.sessionId);
 
     if (!session) {
-      return this.createMissingSessionResult(input.sessionId, input.sequence);
+      const result = this.createMissingSessionResult(input.sessionId, input.sequence);
+      this.scheduleFullSnapshot(result);
+      return result;
     }
 
     if (!Number.isInteger(input.sequence) || input.sequence < 0) {
@@ -99,58 +126,24 @@ export class ActionSequenceService {
     const expectedNext = lastSequence + 1;
 
     if (input.sequence === expectedNext) {
-      return {
-        sessionId: session.sessionId,
-        sequence: input.sequence,
-        previousSequence: lastSequence,
-        expectedNext,
-        status: "accept",
-        requiresFullResync: false,
-        message: "Sequence accepted"
-      } satisfies SequenceAcceptResult;
+      return this.createAcceptResult(session, input.sequence, lastSequence, expectedNext);
     }
 
     if (input.sequence === lastSequence) {
-      return {
-        sessionId: session.sessionId,
-        sequence: input.sequence,
-        previousSequence: lastSequence,
-        expectedNext,
-        status: "duplicate",
-        requiresFullResync: false,
-        message: "Duplicate sequence received"
-      } satisfies SequenceDuplicateResult;
+      return this.createDuplicateResult(session, input.sequence, lastSequence, expectedNext);
     }
 
     if (input.sequence < expectedNext) {
-      return {
-        sessionId: session.sessionId,
-        sequence: input.sequence,
-        previousSequence: lastSequence,
-        expectedNext,
-        status: "out_of_order",
-        errorCode: "SEQ_OUT_OF_ORDER",
-        requiresFullResync: false,
-        message: `Received sequence ${input.sequence} but expected >= ${expectedNext}`
-      } satisfies SequenceOutOfOrderResult;
+      return this.createOutOfOrderResult(session, input.sequence, lastSequence, expectedNext);
     }
 
-    const missingCount = input.sequence - expectedNext;
-
-    return {
-      sessionId: session.sessionId,
-      sequence: input.sequence,
-      previousSequence: lastSequence,
-      expectedNext,
-      status: "gap",
-      errorCode: "SEQ_GAP_DETECTED",
-      missingCount,
-      requiresFullResync: true,
-      message: `Detected gap before sequence ${input.sequence}; missing ${missingCount} sequence(s)`
-    } satisfies SequenceGapResult;
+    const result = this.createGapResult(session, input.sequence, lastSequence, expectedNext);
+    this.scheduleFullSnapshot(result);
+    return result;
   }
 
   acknowledge(input: AcknowledgeSequenceInput): PlayerSessionState | null {
+    this.pendingSnapshots.delete(input.sessionId);
     return this.sessions.recordActionSequence(input.sessionId, input.sequence);
   }
 
@@ -166,15 +159,106 @@ export class ActionSequenceService {
     }
 
     const normalized = Math.max(0, Math.floor(sequence));
-    return this.sessions.createOrUpdateSession({
+    const updated = this.sessions.createOrUpdateSession({
       sessionId: session.sessionId,
       userId: session.userId,
       characterId: session.characterId,
-      protocolVersion: session.protocolVersion,
       status: session.status,
+      protocolVersion: session.protocolVersion,
       initialSequenceNumber: normalized,
       heartbeatAt: session.lastHeartbeatAt
     });
+
+    this.pendingSnapshots.delete(sessionId);
+    return updated;
+  }
+
+  consumePendingSnapshot(sessionId: string): SequenceGapResult | SequenceMissingSessionResult | null {
+    this.expireStaleSnapshot(sessionId);
+    const entry = this.pendingSnapshots.get(sessionId);
+    if (!entry) {
+      return null;
+    }
+
+    this.pendingSnapshots.delete(sessionId);
+    return entry.result;
+  }
+
+  hasPendingSnapshot(sessionId: string): boolean {
+    this.expireStaleSnapshot(sessionId);
+    return this.pendingSnapshots.has(sessionId);
+  }
+
+  private createAcceptResult(
+    session: PlayerSessionState,
+    sequence: number,
+    previousSequence: number,
+    expectedNext: number
+  ): SequenceAcceptResult {
+    return {
+      sessionId: session.sessionId,
+      sequence,
+      previousSequence,
+      expectedNext,
+      status: "accept",
+      requiresFullResync: false,
+      message: "Sequence accepted"
+    } satisfies SequenceAcceptResult;
+  }
+
+  private createDuplicateResult(
+    session: PlayerSessionState,
+    sequence: number,
+    previousSequence: number,
+    expectedNext: number
+  ): SequenceDuplicateResult {
+    return {
+      sessionId: session.sessionId,
+      sequence,
+      previousSequence,
+      expectedNext,
+      status: "duplicate",
+      requiresFullResync: false,
+      message: "Duplicate sequence received"
+    } satisfies SequenceDuplicateResult;
+  }
+
+  private createOutOfOrderResult(
+    session: PlayerSessionState,
+    sequence: number,
+    previousSequence: number,
+    expectedNext: number
+  ): SequenceOutOfOrderResult {
+    return {
+      sessionId: session.sessionId,
+      sequence,
+      previousSequence,
+      expectedNext,
+      status: "out_of_order",
+      errorCode: "SEQ_OUT_OF_ORDER",
+      requiresFullResync: false,
+      message: `Received sequence ${sequence} but expected >= ${expectedNext}`
+    } satisfies SequenceOutOfOrderResult;
+  }
+
+  private createGapResult(
+    session: PlayerSessionState,
+    sequence: number,
+    previousSequence: number,
+    expectedNext: number
+  ): SequenceGapResult {
+    const missingCount = Math.max(1, sequence - expectedNext);
+    return {
+      sessionId: session.sessionId,
+      sequence,
+      previousSequence,
+      expectedNext,
+      status: "gap",
+      errorCode: "SEQ_GAP_DETECTED",
+      missingCount,
+      requiresFullResync: true,
+      message: `Detected gap before sequence ${sequence}; missing ${missingCount} sequence(s)`
+    } satisfies SequenceGapResult;
   }
 
   private createMissingSessionResult(sessionId: string, sequence: number): SequenceMissingSessionResult {
@@ -201,5 +285,45 @@ export class ActionSequenceService {
       requiresFullResync: false,
       message: "Sequence must be a non-negative integer"
     } satisfies SequenceInvalidResult;
+  }
+
+  private scheduleFullSnapshot(result: SequenceGapResult | SequenceMissingSessionResult): void {
+    const sessionId = result.sessionId;
+    if (!sessionId) {
+      return;
+    }
+
+    const entry = this.pendingSnapshots.get(sessionId);
+    const now = this.now();
+    if (entry && !this.isEntryExpired(entry, now)) {
+      if (entry.result.sequence <= result.sequence) {
+        entry.scheduledAt = now;
+        return;
+      }
+    }
+
+    if (!entry || this.isEntryExpired(entry, now)) {
+      this.metrics?.recordForcedStateRefresh();
+    }
+
+    this.pendingSnapshots.set(sessionId, {
+      result,
+      scheduledAt: now
+    });
+  }
+
+  private expireStaleSnapshot(sessionId: string): void {
+    const entry = this.pendingSnapshots.get(sessionId);
+    if (!entry) {
+      return;
+    }
+
+    if (this.isEntryExpired(entry, this.now())) {
+      this.pendingSnapshots.delete(sessionId);
+    }
+  }
+
+  private isEntryExpired(entry: PendingSnapshotEntry, reference: Date): boolean {
+    return reference.getTime() - entry.scheduledAt.getTime() > this.pendingSnapshotTtlMs;
   }
 }

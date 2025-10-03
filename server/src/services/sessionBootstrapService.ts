@@ -3,6 +3,8 @@ import { SERVER_BUILD_VERSION } from "../infra/version.js";
 import type { CharacterProfile, CharacterProfileRepository } from "../models/characterProfile.js";
 import type { PlayerSessionState, PlayerSessionStore } from "../models/playerSession.js";
 import type { ReconnectToken, ReconnectTokenStore } from "../models/reconnectToken.js";
+import type { MetricsService } from "./metricsService.js";
+import { getAppLogger, type AppLogger } from "../logging/logger.js";
 
 export interface TokenValidationResult {
   userId: string;
@@ -22,6 +24,8 @@ export interface SessionBootstrapServiceDependencies {
   generateSessionId?: () => string;
   characterIdFactory?: (userId: string) => string;
   reconnectTtlSeconds?: number;
+  metrics?: MetricsService;
+  logger?: AppLogger;
 }
 
 export interface BootstrapSessionInput {
@@ -73,6 +77,8 @@ export class SessionBootstrapService {
   private readonly generateSessionId: () => string;
   private readonly characterIdFactory: (userId: string) => string;
   private readonly reconnectTtlSeconds?: number;
+  private readonly metrics?: MetricsService;
+  private readonly logger: AppLogger;
 
   constructor(dependencies: SessionBootstrapServiceDependencies) {
     this.characterProfiles = dependencies.characterProfiles;
@@ -85,6 +91,9 @@ export class SessionBootstrapService {
     this.generateSessionId = dependencies.generateSessionId ?? (() => randomUUID());
     this.characterIdFactory = dependencies.characterIdFactory ?? deterministicCharacterId;
     this.reconnectTtlSeconds = dependencies.reconnectTtlSeconds;
+    this.metrics = dependencies.metrics;
+    const rootLogger = dependencies.logger ?? getAppLogger();
+    this.logger = rootLogger.child?.({ module: "sessionBootstrapService" }) ?? rootLogger;
   }
 
   async bootstrapSession(input: BootstrapSessionInput): Promise<BootstrapSessionResult> {
@@ -92,12 +101,32 @@ export class SessionBootstrapService {
       throw new Error("authorization_token_missing");
     }
 
-    const { userId } = await this.tokenValidator(input.token);
+    this.metrics?.recordConnectAttempt();
+
+    let validation: TokenValidationResult;
+    try {
+      validation = await this.tokenValidator(input.token);
+    } catch (error) {
+      this.logger.warn?.("session.bootstrap.token_validation_failed", {
+        message: error instanceof Error ? error.message : String(error)
+      });
+      throw error;
+    }
+
+    const { userId, metadata } = validation;
     if (!userId) {
+      this.logger.warn?.("session.bootstrap.token_validation_missing_user", {
+        details: metadata ? "metadata_present" : "metadata_absent"
+      });
       throw new Error("authorization_token_invalid");
     }
 
     const issuedAt = this.now();
+    this.logger.debug?.("session.bootstrap.start", {
+      issuedAt: issuedAt.toISOString(),
+      hasReconnectToken: Boolean(input.reconnectToken),
+      clientVersion: input.clientVersion
+    });
 
     let priorReconnect: ReconnectToken | null = null;
     if (input.reconnectToken) {
@@ -155,6 +184,13 @@ export class SessionBootstrapService {
         roomId: undefined
       }
     };
+
+    this.metrics?.recordConnectSuccess();
+    this.logger.info?.("session.bootstrap.success", {
+      sessionId: result.session.sessionId,
+      userId: result.session.userId,
+      reconnectTokenIssued: Boolean(result.reconnect.token)
+    });
 
     return result;
   }

@@ -10,12 +10,16 @@ import type { ReconnectToken, ReconnectTokenStore } from "../models/reconnectTok
 import type { CharacterProfile, CharacterProfileRepository } from "../models/characterProfile.js";
 import type { ActionDurabilityService } from "./actionDurabilityService.js";
 import type { ActionEventRecord, ActionEventType } from "../models/actionEvent.js";
+import type { MetricsService } from "./metricsService.js";
+import { getAppLogger, type AppLogger } from "../logging/logger.js";
 
 export interface ReconnectServiceDependencies {
   redis: RedisClientType;
   defaultGracePeriodMs?: number;
   keyPrefix?: string;
   clock?: () => number;
+  metrics?: MetricsService;
+  logger?: AppLogger;
 }
 
 export interface CreateReconnectSessionInput {
@@ -80,6 +84,8 @@ export class ReconnectService {
   private readonly basePrefix: string;
   private readonly sessionKeyPrefix: string;
   private readonly playerKeyPrefix: string;
+  private readonly metrics?: MetricsService;
+  private readonly logger: AppLogger;
 
   constructor(dependencies: ReconnectServiceDependencies) {
     this.redis = dependencies.redis;
@@ -89,6 +95,9 @@ export class ReconnectService {
     this.basePrefix = dependencies.keyPrefix ?? "reconnect:";
     this.sessionKeyPrefix = `${this.basePrefix}session:`;
     this.playerKeyPrefix = `${this.basePrefix}player:`;
+    this.metrics = dependencies.metrics;
+    const rootLogger = dependencies.logger ?? getAppLogger();
+    this.logger = rootLogger.child?.({ module: "reconnectService" }) ?? rootLogger;
   }
 
   async createSession(input: CreateReconnectSessionInput): Promise<ReconnectSession> {
@@ -106,6 +115,13 @@ export class ReconnectService {
     };
 
     await this.persistSession(session, gracePeriodMs);
+
+    this.logger.info?.("reconnect.session.created", {
+      playerId: input.playerId,
+      instanceId: input.instanceId,
+      sessionId: input.sessionId,
+      gracePeriodMs
+    });
 
     return session;
   }
@@ -141,9 +157,22 @@ export class ReconnectService {
   }
 
   async attemptReconnect(input: AttemptReconnectInput): Promise<ReconnectResult> {
+    this.metrics?.recordReconnectAttempt();
+    this.logger.info?.("reconnect.attempt", {
+      playerId: input.playerId,
+      instanceId: input.instanceId,
+      newSessionId: input.newSessionId,
+      requestId: input.requestId
+    });
+
     const session = await this.getSession(input.playerId, input.instanceId);
 
     if (!session) {
+      this.logger.warn?.("reconnect.attempt.expired", {
+        playerId: input.playerId,
+        instanceId: input.instanceId,
+        requestId: input.requestId
+      });
       throw new TileMudError(
         "GRACE_PERIOD_EXPIRED",
         { playerId: input.playerId, instanceId: input.instanceId },
@@ -153,6 +182,11 @@ export class ReconnectService {
 
     if (this.isExpired(session)) {
       await this.removeSession(input.playerId, input.instanceId);
+      this.logger.warn?.("reconnect.attempt.expired_after_fetch", {
+        playerId: input.playerId,
+        instanceId: input.instanceId,
+        requestId: input.requestId
+      });
       throw new TileMudError(
         "GRACE_PERIOD_EXPIRED",
         { playerId: input.playerId, instanceId: input.instanceId },
@@ -163,6 +197,15 @@ export class ReconnectService {
     session.sessionId = input.newSessionId;
     const remainingMs = this.getRemainingMs(session);
     await this.persistSession(session, remainingMs);
+
+    this.metrics?.recordReconnectSuccess();
+    this.logger.info?.("reconnect.attempt.success", {
+      playerId: input.playerId,
+      instanceId: input.instanceId,
+      newSessionId: input.newSessionId,
+      requestId: input.requestId,
+      remainingMs
+    });
 
     return { success: true, session };
   }
