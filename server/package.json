@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@colyseus/schema": "3.0.61",
+    "@colyseus/ws-transport": "0.16.4",
     "colyseus": "0.16.4",
     "colyseus.js": "0.16.4",
     "dotenv": "16.4.5",

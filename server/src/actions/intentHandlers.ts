@@ -100,34 +100,81 @@ export class RealtimeIntentProcessor {
     });
 
     if (evaluation.status === "accept") {
-      const nextPosition = this.computeNextPosition(context.payload.direction, context.payload.magnitude);
+      const previousPosition = structuredClone(context.player.getPosition());
+      const magnitude = this.normalizeMagnitude(context.payload.magnitude);
+      const nextPosition = this.computeNextPosition(context.payload.direction, magnitude);
       const targetPosition = {
-        x: context.player.getPosition().x + nextPosition.x,
-        y: context.player.getPosition().y + nextPosition.y
+        x: previousPosition.x + nextPosition.x,
+        y: previousPosition.y + nextPosition.y
       };
 
-      context.player.setPosition(targetPosition);
-      this.onSequenceAcknowledged(context.player, context.sequence);
+      try {
+        const { metadata } = await this.durabilityService.persistAction({
+          sessionId: context.player.sessionId,
+          userId: context.player.userId,
+          characterId: context.player.characterId,
+          sequenceNumber: context.sequence,
+          actionType: "move",
+          payload: {
+            direction: context.payload.direction,
+            magnitude,
+            origin: previousPosition,
+            target: structuredClone(targetPosition),
+            metadata: structuredClone(context.payload.metadata ?? {})
+          }
+        });
 
-      const ack = this.createIntentAck("intent.move", context.sequence, "applied", context.now, context.latencyMs);
-      const delta = this.createStateDelta(context, {
-        includeCharacter: true
-      });
+        context.player.setPosition(targetPosition);
+        this.onSequenceAcknowledged(context.player, context.sequence);
 
-      return {
-        kind: "success",
-        status: "applied",
-        ack,
-        stateDelta: delta
-      } satisfies IntentProcessingOutcome;
+        const ack = this.createIntentAck("intent.move", context.sequence, "applied", context.now, context.latencyMs, {
+          durability: metadata,
+          message: "movement_applied"
+        });
+
+        const delta = this.createStateDelta(context, {
+          includeCharacter: true,
+          effects: [
+            {
+              type: "movement",
+              actionId: metadata.actionEventId,
+              origin: previousPosition,
+              target: structuredClone(targetPosition),
+              direction: context.payload.direction,
+              magnitude
+            } satisfies StateEffect
+          ]
+        });
+
+        return {
+          kind: "success",
+          status: "applied",
+          ack,
+          stateDelta: delta
+        } satisfies IntentProcessingOutcome;
+      } catch (error) {
+        return {
+          kind: "error",
+          error: this.mapPersistenceError("intent.move", context.sequence, error)
+        } satisfies IntentProcessingOutcome;
+      }
     }
 
     if (evaluation.status === "duplicate") {
-      const ack = this.createIntentAck("intent.move", context.sequence, "duplicate", context.now, context.latencyMs);
+      const rejection = {
+        sessionId: evaluation.sessionId,
+        sequence: evaluation.sequence,
+        previousSequence: evaluation.previousSequence,
+        expectedNext: evaluation.expectedNext,
+        status: "out_of_order" as const,
+        errorCode: "SEQ_OUT_OF_ORDER" as const,
+        requiresFullResync: false,
+        message: evaluation.message ?? "Duplicate sequence received"
+      } satisfies Extract<SequenceEvaluationResult, { status: "out_of_order" }>;
+
       return {
-        kind: "success",
-        status: "duplicate",
-        ack
+        kind: "error",
+        error: this.mapSequenceRejection("intent.move", context.sequence, rejection)
       } satisfies IntentProcessingOutcome;
     }
 
@@ -149,21 +196,45 @@ export class RealtimeIntentProcessor {
         return { kind: "error", error: rateLimitError } satisfies IntentProcessingOutcome;
       }
 
-      this.onSequenceAcknowledged(context.player, context.sequence);
+      try {
+        const { metadata } = await this.durabilityService.persistAction({
+          sessionId: context.player.sessionId,
+          userId: context.player.userId,
+          characterId: context.player.characterId,
+          sequenceNumber: context.sequence,
+          actionType: "chat",
+          payload: {
+            channel: context.payload.channel,
+            message: context.payload.message,
+            locale: context.payload.locale ?? null
+          }
+        });
 
-      const ack = this.createIntentAck("intent.chat", context.sequence, "applied", context.now, context.latencyMs, {
-        message: "chat_delivered"
-      });
+        this.onSequenceAcknowledged(context.player, context.sequence);
 
-      return {
-        kind: "success",
-        status: "applied",
-        ack
-      } satisfies IntentProcessingOutcome;
+        const ack = this.createIntentAck("intent.chat", context.sequence, "applied", context.now, context.latencyMs, {
+          durability: metadata,
+          message: "chat_delivered"
+        });
+
+        return {
+          kind: "success",
+          status: "applied",
+          ack
+        } satisfies IntentProcessingOutcome;
+      } catch (error) {
+        return {
+          kind: "error",
+          error: this.mapPersistenceError("intent.chat", context.sequence, error)
+        } satisfies IntentProcessingOutcome;
+      }
     }
 
     if (evaluation.status === "duplicate") {
-      const ack = this.createIntentAck("intent.chat", context.sequence, "duplicate", context.now, context.latencyMs);
+      const durability = await this.fetchDurability(context.player.sessionId, context.sequence, true);
+      const ack = this.createIntentAck("intent.chat", context.sequence, "duplicate", context.now, context.latencyMs, {
+        durability
+      });
       return {
         kind: "success",
         status: "duplicate",
@@ -220,7 +291,7 @@ export class RealtimeIntentProcessor {
           stateDelta: delta
         } satisfies IntentProcessingOutcome;
       } catch (error) {
-        const parsed = this.mapActionPersistenceError(error, context, context.sequence);
+        const parsed = this.mapPersistenceError("intent.action", context.sequence, error);
         return { kind: "error", error: parsed } satisfies IntentProcessingOutcome;
       }
     }
@@ -404,14 +475,22 @@ export class RealtimeIntentProcessor {
     } satisfies Record<string, unknown>;
   }
 
-  private mapActionPersistenceError(
-    error: unknown,
-    context: IntentProcessingContext<IntentActionPayload>,
-    sequence: number
-  ): IntentErrorPayload {
+  private async fetchDurability(
+    sessionId: string,
+    sequence: number,
+    duplicate = false
+  ): Promise<DurabilityMetadata | undefined> {
+    const record = await this.durabilityService.getBySessionAndSequence(sessionId, sequence);
+    if (!record) {
+      return undefined;
+    }
+    return mapRecordToDurability(record, duplicate);
+  }
+
+  private mapPersistenceError(intentType: string, sequence: number, error: unknown): IntentErrorPayload {
     if (error instanceof TileMudError) {
       return {
-        intentType: "intent.action",
+        intentType,
         sequence,
         code: error.code,
         category: error.definition.category.toUpperCase() as IntentErrorPayload["category"],
@@ -421,13 +500,17 @@ export class RealtimeIntentProcessor {
     }
 
     return {
-      intentType: "intent.action",
+      intentType,
       sequence,
       code: "ACTION_PERSIST_FAILURE",
       category: "SYSTEM",
       retryable: true,
       message: error instanceof Error ? error.message : "Failed to persist action"
     } satisfies IntentErrorPayload;
+  }
+
+  private normalizeMagnitude(magnitude: number): number {
+    return Math.max(1, Math.min(3, Math.floor(magnitude)));
   }
 }
 

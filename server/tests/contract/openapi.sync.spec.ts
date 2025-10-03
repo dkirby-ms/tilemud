@@ -11,10 +11,10 @@ import path from "node:path";
 
 describe("OpenAPI contract sync", () => {
   it("generated types signature matches contract", async () => {
-  // repoRoot: server/tests/contract -> ../../../ = repo root
-  const repoRoot = path.resolve(__dirname, "../../../");
-  const contractPath = path.join(repoRoot, "specs/004-i-want-to/contracts/game-service.yaml");
-  const generatedPath = path.join(repoRoot, "server/src/contracts/api-types.d.ts");
+    // repoRoot: server/tests/contract -> ../../../ = repo root
+    const repoRoot = path.resolve(__dirname, "../../../");
+    const contractPath = path.join(repoRoot, "specs/004-game-server/contracts/game-service.yaml");
+    const generatedPath = path.join(repoRoot, "server/src/contracts/api-types.d.ts");
 
     const contract = await readFile(contractPath, "utf8").catch(() => null);
     expect(contract, "OpenAPI contract missing at expected path").not.toBeNull();

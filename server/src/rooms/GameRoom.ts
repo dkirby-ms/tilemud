@@ -1,10 +1,9 @@
 import { Room, type Client } from "colyseus";
 import { MapSchema, Schema, defineTypes } from "@colyseus/schema";
 import { z } from "zod";
-import type { PlayerSessionState, PlayerSessionStore } from "../models/playerSession.js";
+import type { PlayerSessionStore } from "../models/playerSession.js";
 import type { CharacterProfile, CharacterProfileRepository } from "../models/characterProfile.js";
 import type { MetricsService } from "../services/metricsService.js";
-import type { VersionService } from "../services/versionService.js";
 import type { RateLimiterService } from "../services/rateLimiter.js";
 import type { ActionSequenceService } from "../services/actionSequenceService.js";
 import type { ActionDurabilityService } from "../services/actionDurabilityService.js";
@@ -22,8 +21,11 @@ import {
   realtimeIntentSchemas,
   type IntentActionPayload,
   type IntentChatPayload,
-  type IntentMovePayload
+  type IntentMovePayload,
+  type EventStateDelta
 } from "../contracts/realtimeSchemas.js";
+import { VersionMismatchGuard, type VersionMismatchGuardResult } from "./versionMismatchGuard.js";
+import { DegradedEmitter } from "./degradedEmitter.js";
 
 interface LoggerLike {
   info?: (...args: unknown[]) => void;
@@ -83,7 +85,7 @@ export interface GameRoomDependencies {
   sessions: PlayerSessionStore;
   characterProfiles: CharacterProfileRepository;
   metrics: MetricsService;
-  versionService: VersionService;
+  versionService: import("../services/versionService.js").VersionService;
   sequenceService: ActionSequenceService;
   durabilityService: ActionDurabilityService;
   rateLimiter?: RateLimiterService;
@@ -92,29 +94,47 @@ export interface GameRoomDependencies {
   degradedSignalService?: DegradedSignalService;
   now?: () => Date;
   logger?: LoggerLike;
+  versionGuard?: VersionMismatchGuard;
 }
 
 export interface GameRoomOptions {
   services: GameRoomDependencies;
 }
 
-type NormalizedGameRoomDependencies = GameRoomDependencies & Required<Pick<GameRoomDependencies, "logger">> & {
-  now: () => Date;
-};
+type NormalizedGameRoomDependencies = GameRoomDependencies &
+  Required<Pick<GameRoomDependencies, "logger">> & {
+    now: () => Date;
+    versionGuard: VersionMismatchGuard;
+  };
 
 export class GameRoom extends Room<GameRoomState> {
+  private readonly stateDeltaChannel = "event.state_delta" as const;
   private dependencies!: NormalizedGameRoomDependencies;
   private readonly players = new Map<string, ConnectedPlayer>();
   private intentProcessor!: RealtimeIntentProcessor;
+  private versionGuard!: VersionMismatchGuard;
+  private degradedEmitter?: DegradedEmitter;
 
   async onCreate(options: GameRoomOptions): Promise<void> {
     this.dependencies = normalizeGameRoomDependencies(options.services);
+    this.versionGuard = this.dependencies.versionGuard;
     this.intentProcessor = new RealtimeIntentProcessor({
       sequenceService: this.dependencies.sequenceService,
       durabilityService: this.dependencies.durabilityService,
       sessions: this.dependencies.sessions,
       metrics: this.dependencies.metrics
     });
+
+    if (this.dependencies.degradedSignalService) {
+      this.degradedEmitter = new DegradedEmitter({
+        service: this.dependencies.degradedSignalService,
+        room: this,
+        logger: this.dependencies.logger,
+        now: this.dependencies.now
+      });
+      this.degradedEmitter.start();
+    }
+
     this.setState(new GameRoomState());
     this.maxClients = 120;
     this.autoDispose = false;
@@ -140,6 +160,16 @@ export class GameRoom extends Room<GameRoomState> {
 
     const baselineSession = this.dependencies.sessions.recordHeartbeat(session.sessionId, now) ?? session;
     this.dependencies.sessions.setStatus(baselineSession.sessionId, "active");
+
+    const versionResult = this.versionGuard.check(joinPayload.clientVersion ?? session.protocolVersion, {
+      sessionId: baselineSession.sessionId,
+      userId: baselineSession.userId,
+      clientId: client.sessionId
+    });
+    if (!versionResult.compatible) {
+      await this.handleVersionMismatch(client, versionResult);
+      return;
+    }
 
     const profile = await this.ensureCharacterProfile(baselineSession.characterId, baselineSession.userId);
     const handshakeSequence = baselineSession.lastSequenceNumber ?? 0;
@@ -171,6 +201,8 @@ export class GameRoom extends Room<GameRoomState> {
       userId: baselineSession.userId,
       clientId: client.sessionId
     });
+
+    this.degradedEmitter?.emitSnapshot(client);
   }
 
   async onLeave(client: Client): Promise<void> {
@@ -343,6 +375,7 @@ export class GameRoom extends Room<GameRoomState> {
       client.send("event.ack", outcome.ack);
       if (outcome.stateDelta) {
         client.send("event.state_delta", outcome.stateDelta);
+        this.broadcastStateDelta(client, player, outcome.stateDelta);
       }
 
       const latencyMs = outcome.ack.latencyMs;
@@ -367,6 +400,26 @@ export class GameRoom extends Room<GameRoomState> {
       sequence,
       code: outcome.error.code,
       category: outcome.error.category
+    });
+  }
+
+  private broadcastStateDelta(originClient: Client, originPlayer: ConnectedPlayer, delta: EventStateDelta["payload"]): void {
+    if (!this.clients?.length) {
+      return;
+    }
+
+    for (const client of this.clients) {
+      if (client.sessionId === originClient.sessionId) {
+        continue;
+      }
+
+      client.send(this.stateDeltaChannel, structuredClone(delta));
+    }
+
+    this.dependencies.logger.debug?.("game_room.state_delta.broadcast", {
+      originSessionId: originPlayer.sessionId,
+      sequence: delta.sequence,
+      recipients: this.clients.length - 1
     });
   }
 
@@ -436,6 +489,10 @@ export class GameRoom extends Room<GameRoomState> {
     }
   }
 
+  async onDispose(): Promise<void> {
+    this.degradedEmitter?.stop();
+  }
+
   private async handleJoinFailure(
     client: Client,
     code: string,
@@ -463,6 +520,29 @@ export class GameRoom extends Room<GameRoomState> {
     } catch {
       // Intentionally swallow errors while disconnecting during handshake failures.
     }
+  }
+
+  private async handleVersionMismatch(client: Client, result: VersionMismatchGuardResult): Promise<void> {
+    const { compatibility, eventPayload, disconnectCode = 4_408, disconnectReason = "version_mismatch" } = result;
+
+    this.dependencies.logger.warn?.("game_room.version_mismatch", {
+      clientId: client.sessionId,
+      expectedVersion: compatibility.expectedVersion,
+      receivedVersion: compatibility.receivedVersion,
+      reason: compatibility.reason
+    });
+
+    setTimeout(() => {
+      client.send("event.version_mismatch", eventPayload ?? {
+        expectedVersion: compatibility.expectedVersion,
+        receivedVersion: compatibility.receivedVersion ?? "unknown",
+        message: compatibility.message
+      });
+    }, 0);
+
+    setTimeout(() => {
+      void Promise.resolve(client.leave(disconnectCode, disconnectReason)).catch(() => undefined);
+    }, 50);
   }
 
   private createHandshakeAckPayload(sessionId: string, sequence: number, timestamp: Date) {
@@ -546,10 +626,6 @@ function normalizeGameRoomDependencies(dependencies: GameRoomDependencies): Norm
     throw new Error("Game room dependency \"metrics\" is required");
   }
 
-  if (!dependencies.versionService) {
-    throw new Error("Game room dependency \"versionService\" is required");
-  }
-
   if (!dependencies.sequenceService) {
     throw new Error("Game room dependency \"sequenceService\" is required");
   }
@@ -558,9 +634,24 @@ function normalizeGameRoomDependencies(dependencies: GameRoomDependencies): Norm
     throw new Error("Game room dependency \"durabilityService\" is required");
   }
 
+  if (!dependencies.versionService) {
+    throw new Error("Game room dependency \"versionService\" is required");
+  }
+
+  const now = dependencies.now ?? (() => new Date());
+  const logger = dependencies.logger ?? console;
+  const versionGuard = dependencies.versionGuard ??
+    new VersionMismatchGuard({
+      versionService: dependencies.versionService,
+      metrics: dependencies.metrics,
+      now,
+      logger
+    });
+
   return {
     ...dependencies,
-    logger: dependencies.logger ?? console,
-    now: dependencies.now ?? (() => new Date())
+    logger,
+    now,
+    versionGuard
   } satisfies NormalizedGameRoomDependencies;
 }

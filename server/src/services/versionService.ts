@@ -118,8 +118,8 @@ export class VersionService {
       reason === "behind"
         ? "Client version is behind server version; please update the client."
         : reason === "ahead"
-          ? "Client version is ahead of server version; please ensure you are running the latest server build."
-          : "Client version does not match supported versions.";
+          ? "Client version is ahead of server version; please update or align with the latest server build."
+          : "Client version does not match supported versions; please update the client.";
 
     return {
       isCompatible: false,

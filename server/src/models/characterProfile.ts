@@ -76,7 +76,7 @@ class PostgresCharacterProfileRepository implements CharacterProfileRepository {
         stats_json,
         updated_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, NOW())
+      VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, DATE_TRUNC('milliseconds', NOW()))
       RETURNING character_id, user_id, display_name, position_x, position_y, health, inventory_json, stats_json, updated_at`,
       [
         input.characterId,
@@ -149,7 +149,7 @@ class PostgresCharacterProfileRepository implements CharacterProfileRepository {
       index += 1;
     }
 
-    setClauses.push("updated_at = NOW()");
+  setClauses.push("updated_at = DATE_TRUNC('milliseconds', NOW())");
 
     params.push(input.characterId, input.userId, input.expectedUpdatedAt);
 

@@ -1,9 +1,16 @@
-import pg from "pg";
-const { Pool } = pg;
+import pg, { Pool } from "pg";
 import type { PoolClient, Pool as PoolType } from "pg";
 import { getConfig } from "./config.js";
 
 let pool: PoolType | null = null;
+
+const pgTypes = (pg as unknown as { types: { setTypeParser: (oid: number, parser: (value: string) => unknown) => void } }).types;
+
+const parseInteger = (value: string): number => Number.parseInt(value, 10);
+
+pgTypes.setTypeParser(20, parseInteger); // int8
+pgTypes.setTypeParser(21, parseInteger); // int2
+pgTypes.setTypeParser(23, parseInteger); // int4
 
 export interface PostgresClient {
   query: PoolClient["query"];
