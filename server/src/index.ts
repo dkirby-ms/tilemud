@@ -71,6 +71,7 @@ export async function start(): Promise<StartedServer> {
     reconnectService: container.reconnectService,
     reconnectTokens: container.reconnectTokenStore,
     degradedSignalService: container.degradedSignalService,
+    inactivityTimeouts: container.inactivityTimeoutService,
     logger: logger.child?.({ scope: "GameRoom" }) ?? logger,
     now: () => new Date()
   } satisfies GameRoomDependencies;

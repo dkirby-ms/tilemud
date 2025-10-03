@@ -223,6 +223,14 @@ export async function createRealtimeTestHarness(options: RealtimeTestOptions = {
         lastDisconnectReason = "version_mismatch";
       }
 
+      if (event.type === "event.disconnect") {
+        const disconnectPayload = event.payload as { reason?: unknown };
+        const reason = typeof disconnectPayload?.reason === "string" ? disconnectPayload.reason : undefined;
+        if (reason) {
+          lastDisconnectReason = reason;
+        }
+      }
+
       const pendingWaiters = waiters.get(event.type);
       if (pendingWaiters && pendingWaiters.length > 0) {
         const resolver = pendingWaiters.shift();

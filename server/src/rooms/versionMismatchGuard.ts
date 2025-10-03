@@ -35,6 +35,7 @@ export interface VersionMismatchGuardResult {
   eventPayload?: EventVersionMismatch["payload"];
   disconnectCode?: number;
   disconnectReason?: string;
+  disconnectAt?: Date;
 }
 
 type VersionMismatchListener = (notification: VersionMismatchNotification) => void;
@@ -70,7 +71,8 @@ export class VersionMismatchGuard {
     this.metrics?.recordVersionReject();
 
     const observedAt = this.now();
-    const eventPayload = this.createEventPayload(compatibility, observedAt);
+    const disconnectAt = new Date(observedAt.getTime() + this.disconnectGraceMs);
+    const eventPayload = this.createEventPayload(compatibility, disconnectAt);
 
     this.logger?.warn?.("version_guard.mismatch", {
       sessionId: context.sessionId,
@@ -94,7 +96,8 @@ export class VersionMismatchGuard {
       compatibility,
       eventPayload,
       disconnectCode: 4_408,
-      disconnectReason: "version_mismatch"
+      disconnectReason: "version_mismatch",
+      disconnectAt
     } satisfies VersionMismatchGuardResult;
   }
 
@@ -117,10 +120,8 @@ export class VersionMismatchGuard {
 
   private createEventPayload(
     compatibility: VersionCompatibilityResult,
-    observedAt: Date
+    disconnectAt: Date
   ): EventVersionMismatch["payload"] {
-    const disconnectAt = new Date(observedAt.getTime() + this.disconnectGraceMs);
-
     return {
       expectedVersion: compatibility.expectedVersion,
       receivedVersion: compatibility.receivedVersion ?? "unknown",

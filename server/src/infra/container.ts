@@ -22,6 +22,7 @@ import { ActionSequenceService } from "../services/actionSequenceService.js";
 import { MetricsService } from "../services/metricsService.js";
 import { DegradedSignalService } from "../services/degradedSignalService.js";
 import { VersionService } from "../services/versionService.js";
+import { InactivityTimeoutService } from "../services/inactivityTimeoutService.js";
 import type { Pool } from "pg";
 import type { RedisClientType } from "redis";
 import { getAppLogger, type AppLogger } from "../logging/logger.js";
@@ -53,6 +54,7 @@ export interface Container {
   metricsService: MetricsService;
   degradedSignalService: DegradedSignalService;
   versionService: VersionService;
+  inactivityTimeoutService: InactivityTimeoutService;
   logger: AppLogger;
 }
 
@@ -97,6 +99,11 @@ export async function initializeContainer(): Promise<Container> {
   const metricsService = new MetricsService();
   const degradedSignalService = new DegradedSignalService({ dependencies: ["redis", "postgres", "metrics"] });
   const versionService = new VersionService();
+  const inactivityTimeoutService = new InactivityTimeoutService({
+    sessions: playerSessionStore,
+    logger
+  });
+  inactivityTimeoutService.start();
   const sessionBootstrapService = new SessionBootstrapService({
     characterProfiles: characterProfileRepository,
     playerSessions: playerSessionStore,
@@ -132,6 +139,7 @@ export async function initializeContainer(): Promise<Container> {
     metricsService,
     degradedSignalService,
     versionService,
+    inactivityTimeoutService,
     logger,
   };
 
@@ -149,6 +157,7 @@ export async function shutdownContainer(): Promise<void> {
   if (container) {
     const logger = container.logger ?? console;
     logger.info?.("infra.shutdown.begin");
+    container.inactivityTimeoutService.stop();
     await Promise.all([
       closePostgres().catch((e) => logger.error?.("infra.postgres.close_failed", e)),
       closeRedis().catch((e) => logger.error?.("infra.redis.close_failed", e)),

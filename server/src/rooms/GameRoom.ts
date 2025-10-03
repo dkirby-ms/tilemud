@@ -11,6 +11,7 @@ import type { ActionEventType } from "../models/actionEvent.js";
 import type { ReconnectService } from "../services/reconnectService.js";
 import type { ReconnectTokenStore } from "../models/reconnectToken.js";
 import type { DegradedSignalService } from "../services/degradedSignalService.js";
+import type { InactivityTimeoutEvent, InactivityTimeoutService } from "../services/inactivityTimeoutService.js";
 import {
   RealtimeIntentProcessor,
   type ChatRateLimitState,
@@ -23,7 +24,8 @@ import {
   type IntentActionPayload,
   type IntentChatPayload,
   type IntentMovePayload,
-  type EventStateDelta
+  type EventStateDelta,
+  type EventVersionMismatch
 } from "../contracts/realtimeSchemas.js";
 import { VersionMismatchGuard, type VersionMismatchGuardResult } from "./versionMismatchGuard.js";
 import { DegradedEmitter } from "./degradedEmitter.js";
@@ -93,6 +95,7 @@ export interface GameRoomDependencies {
   reconnectService?: ReconnectService;
   reconnectTokens?: ReconnectTokenStore;
   degradedSignalService?: DegradedSignalService;
+  inactivityTimeouts?: InactivityTimeoutService;
   now?: () => Date;
   logger?: LoggerLike;
   versionGuard?: VersionMismatchGuard;
@@ -112,9 +115,11 @@ export class GameRoom extends Room<GameRoomState> {
   private readonly stateDeltaChannel = "event.state_delta" as const;
   private dependencies!: NormalizedGameRoomDependencies;
   private readonly players = new Map<string, ConnectedPlayer>();
+  private readonly sessionClientIndex = new Map<string, string>();
   private intentProcessor!: RealtimeIntentProcessor;
   private versionGuard!: VersionMismatchGuard;
   private degradedEmitter?: DegradedEmitter;
+  private inactivityUnsubscribe?: () => void;
 
   async onCreate(options: GameRoomOptions): Promise<void> {
     this.dependencies = normalizeGameRoomDependencies(options.services);
@@ -125,6 +130,17 @@ export class GameRoom extends Room<GameRoomState> {
       sessions: this.dependencies.sessions,
       metrics: this.dependencies.metrics
     });
+
+    if (this.dependencies.inactivityTimeouts) {
+      this.inactivityUnsubscribe = this.dependencies.inactivityTimeouts.subscribe((event: InactivityTimeoutEvent) => {
+        void this.handleInactivityTimeout(event).catch((error: unknown) => {
+          this.dependencies.logger.error?.("game_room.inactivity_timeout.handler_error", {
+            sessionId: event.session.sessionId,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        });
+      });
+    }
 
     if (this.dependencies.degradedSignalService) {
       this.degradedEmitter = new DegradedEmitter({
@@ -198,6 +214,7 @@ export class GameRoom extends Room<GameRoomState> {
     } satisfies ConnectedPlayer;
 
     this.players.set(client.sessionId, connected);
+  this.sessionClientIndex.set(baselineSession.sessionId, client.sessionId);
     this.state.players.set(baselineSession.sessionId, this.createPlayerState(connected));
 
     this.dependencies.metrics.recordConnectSuccess();
@@ -217,6 +234,7 @@ export class GameRoom extends Room<GameRoomState> {
       this.players.delete(client.sessionId);
       this.state.players.delete(player.sessionId);
       this.dependencies.sessions.setStatus(player.sessionId, "terminating");
+      this.sessionClientIndex.delete(player.sessionId);
       this.dependencies.logger.debug?.("game_room.leave", {
         sessionId: player.sessionId,
         userId: player.userId,
@@ -496,6 +514,9 @@ export class GameRoom extends Room<GameRoomState> {
   }
 
   async onDispose(): Promise<void> {
+    this.inactivityUnsubscribe?.();
+    this.inactivityUnsubscribe = undefined;
+    this.sessionClientIndex.clear();
     this.degradedEmitter?.stop();
   }
 
@@ -529,7 +550,13 @@ export class GameRoom extends Room<GameRoomState> {
   }
 
   private async handleVersionMismatch(client: Client, result: VersionMismatchGuardResult): Promise<void> {
-    const { compatibility, eventPayload, disconnectCode = 4_408, disconnectReason = "version_mismatch" } = result;
+    const {
+      compatibility,
+      eventPayload,
+      disconnectCode = 4_408,
+      disconnectReason = "version_mismatch",
+      disconnectAt
+    } = result;
 
     this.dependencies.logger.warn?.("game_room.version_mismatch", {
       clientId: client.sessionId,
@@ -538,17 +565,82 @@ export class GameRoom extends Room<GameRoomState> {
       reason: compatibility.reason
     });
 
-    setTimeout(() => {
-      client.send("event.version_mismatch", eventPayload ?? {
-        expectedVersion: compatibility.expectedVersion,
-        receivedVersion: compatibility.receivedVersion ?? "unknown",
-        message: compatibility.message
-      });
-    }, 0);
+    const payload: EventVersionMismatch["payload"] = eventPayload ?? {
+      expectedVersion: compatibility.expectedVersion,
+      receivedVersion: compatibility.receivedVersion ?? "unknown",
+      message: compatibility.message,
+      disconnectAt: (disconnectAt ?? this.dependencies.now()).toISOString()
+    } satisfies EventVersionMismatch["payload"];
 
-    setTimeout(() => {
+    client.send("event.version_mismatch", payload);
+
+    const targetDisconnectAt = disconnectAt ?? parseIsoDate(payload.disconnectAt);
+    const now = this.dependencies.now();
+    const delayMs = targetDisconnectAt ? Math.max(0, targetDisconnectAt.getTime() - now.getTime()) : 0;
+
+    this.dependencies.logger.debug?.("game_room.version_mismatch_schedule_disconnect", {
+      clientId: client.sessionId,
+      delayMs,
+      reason: disconnectReason
+    });
+
+    const timer = setTimeout(() => {
       void Promise.resolve(client.leave(disconnectCode, disconnectReason)).catch(() => undefined);
-    }, 50);
+    }, delayMs);
+    timer.unref?.();
+  }
+
+  private async handleInactivityTimeout(event: InactivityTimeoutEvent): Promise<void> {
+    const sessionId = event.session.sessionId;
+    const clientId = this.sessionClientIndex.get(sessionId);
+    if (!clientId) {
+      return;
+    }
+
+    const client = this.clients?.find((candidate) => candidate.sessionId === clientId);
+    if (!client) {
+      this.sessionClientIndex.delete(sessionId);
+      return;
+    }
+
+    const player = this.players.get(clientId);
+    this.sessionClientIndex.delete(sessionId);
+
+    this.dependencies.logger.info?.("game_room.inactivity_timeout", {
+      sessionId,
+      userId: event.session.userId,
+      idleMs: event.idleMs,
+      thresholdMs: event.thresholdMs,
+      timedOutAt: event.timedOutAt.toISOString()
+    });
+
+    client.send("event.error", {
+      intentType: undefined,
+      sequence: undefined,
+      code: "SESSION_INACTIVE_TIMEOUT",
+      category: "SYSTEM",
+      retryable: false,
+      message: "Session terminated due to inactivity."
+    });
+
+    client.send("event.disconnect", {
+      code: 4_412,
+      reason: "inactivity_timeout"
+    });
+
+    if (player) {
+      this.dependencies.sessions.setStatus(player.sessionId, "terminating");
+    }
+
+    const timer = setTimeout(() => {
+      void Promise.resolve(client.leave(4_412, "inactivity_timeout")).catch((error) => {
+        this.dependencies.logger.warn?.("game_room.inactivity_timeout.disconnect_failed", {
+          sessionId,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      });
+    }, 25);
+    timer.unref?.();
   }
 
   private createHandshakeAckPayload(
@@ -716,4 +808,15 @@ function normalizeGameRoomDependencies(dependencies: GameRoomDependencies): Norm
     now,
     versionGuard
   } satisfies NormalizedGameRoomDependencies;
+}
+
+function parseIsoDate(value: string | undefined): Date | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) {
+    return undefined;
+  }
+  return new Date(timestamp);
 }

@@ -99,9 +99,9 @@
 - [X] T044 Implement Colyseus room for player sessions `server/src/rooms/GameRoom.ts` (handshake, join, broadcast deltas)
 - [X] T045 Implement real-time intent handlers (move/chat/action) in `server/src/actions/intentHandlers.ts`
 - [X] T046 Integrate durability + sequencing in room pipeline `server/src/rooms/GameRoom.ts` (persist before ack)
-- [ ] T047 Implement version mismatch disconnect logic `server/src/rooms/versionMismatchGuard.ts`
-- [ ] T048 Implement inactivity timeout watchdog `server/src/services/inactivityTimeoutService.ts`
-- [ ] T049 Implement Redis degraded event broadcast hook in `server/src/rooms/degradedEmitter.ts`
+- [X] T047 Implement version mismatch disconnect logic `server/src/rooms/versionMismatchGuard.ts`
+- [X] T048 Implement inactivity timeout watchdog `server/src/services/inactivityTimeoutService.ts`
+- [X] T049 Implement Redis degraded event broadcast hook in `server/src/rooms/degradedEmitter.ts`
 
 ## Phase 3.6: Frontend Integration
 - [ ] T050 Implement session store (status, sequence) in `web-client/src/features/session/sessionStore.ts`
