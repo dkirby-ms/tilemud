@@ -98,7 +98,7 @@
 - [X] T043 Implement GET /api/version Express handler `server/src/api/version.ts`
 - [X] T044 Implement Colyseus room for player sessions `server/src/rooms/GameRoom.ts` (handshake, join, broadcast deltas)
 - [X] T045 Implement real-time intent handlers (move/chat/action) in `server/src/actions/intentHandlers.ts`
-- [ ] T046 Integrate durability + sequencing in room pipeline `server/src/rooms/GameRoom.ts` (persist before ack)
+- [X] T046 Integrate durability + sequencing in room pipeline `server/src/rooms/GameRoom.ts` (persist before ack)
 - [ ] T047 Implement version mismatch disconnect logic `server/src/rooms/versionMismatchGuard.ts`
 - [ ] T048 Implement inactivity timeout watchdog `server/src/services/inactivityTimeoutService.ts`
 - [ ] T049 Implement Redis degraded event broadcast hook in `server/src/rooms/degradedEmitter.ts`

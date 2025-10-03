@@ -1,12 +1,13 @@
 import { Room, type Client } from "colyseus";
 import { MapSchema, Schema, defineTypes } from "@colyseus/schema";
 import { z } from "zod";
-import type { PlayerSessionStore } from "../models/playerSession.js";
+import type { PlayerSessionState, PlayerSessionStore } from "../models/playerSession.js";
 import type { CharacterProfile, CharacterProfileRepository } from "../models/characterProfile.js";
 import type { MetricsService } from "../services/metricsService.js";
 import type { RateLimiterService } from "../services/rateLimiter.js";
 import type { ActionSequenceService } from "../services/actionSequenceService.js";
 import type { ActionDurabilityService } from "../services/actionDurabilityService.js";
+import type { ActionEventType } from "../models/actionEvent.js";
 import type { ReconnectService } from "../services/reconnectService.js";
 import type { ReconnectTokenStore } from "../models/reconnectToken.js";
 import type { DegradedSignalService } from "../services/degradedSignalService.js";
@@ -172,8 +173,13 @@ export class GameRoom extends Room<GameRoomState> {
     }
 
     const profile = await this.ensureCharacterProfile(baselineSession.characterId, baselineSession.userId);
-    const handshakeSequence = baselineSession.lastSequenceNumber ?? 0;
-    const handshakeAck = this.createHandshakeAckPayload(baselineSession.sessionId, handshakeSequence, now);
+    const { handshakeSequence, acknowledgedIntents } = await this.computeHandshakeSequence(baselineSession);
+    const handshakeAck = this.createHandshakeAckPayload(
+      baselineSession.sessionId,
+      handshakeSequence,
+      now,
+      acknowledgedIntents
+    );
     const stateDelta = this.createInitialStateDelta(profile, handshakeSequence, now);
 
     client.send("event.ack", handshakeAck);
@@ -545,15 +551,71 @@ export class GameRoom extends Room<GameRoomState> {
     }, 50);
   }
 
-  private createHandshakeAckPayload(sessionId: string, sequence: number, timestamp: Date) {
+  private createHandshakeAckPayload(
+    sessionId: string,
+    sequence: number,
+    timestamp: Date,
+    acknowledgedIntents: Array<{ intentType: string; sequence: number }>
+  ) {
     return {
       reason: "handshake" as const,
       sessionId,
       sequence,
       version: this.dependencies.versionService.getVersionInfo().version,
-      acknowledgedIntents: [],
+      acknowledgedIntents,
       acknowledgedAt: timestamp.toISOString()
     };
+  }
+
+  private async computeHandshakeSequence(session: PlayerSessionState): Promise<{
+    handshakeSequence: number;
+    acknowledgedIntents: Array<{ intentType: string; sequence: number }>;
+  }> {
+    const baselineSequence = session.lastSequenceNumber ?? 0;
+    let handshakeSequence = baselineSequence;
+    let acknowledgedIntents: Array<{ intentType: string; sequence: number }> = [];
+
+    try {
+      const latest = await this.dependencies.durabilityService.getLatestForSession(session.sessionId);
+      if (latest) {
+        handshakeSequence = Math.max(baselineSequence, latest.sequenceNumber);
+        const intentType = this.mapActionTypeToIntentType(latest.actionType);
+        if (intentType) {
+          acknowledgedIntents = [
+            {
+              intentType,
+              sequence: latest.sequenceNumber
+            }
+          ];
+        }
+      }
+    } catch (error) {
+      this.dependencies.logger.error?.("game_room.handshake.compute_sequence_failed", {
+        sessionId: session.sessionId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+
+    this.dependencies.sequenceService.resetSequence(session.sessionId, handshakeSequence);
+    this.dependencies.sessions.recordActionSequence(session.sessionId, handshakeSequence);
+
+    return {
+      handshakeSequence,
+      acknowledgedIntents
+    };
+  }
+
+  private mapActionTypeToIntentType(actionType: ActionEventType): string | null {
+    switch (actionType) {
+      case "move":
+        return "intent.move";
+      case "chat":
+        return "intent.chat";
+      case "ability":
+        return "intent.action";
+      default:
+        return null;
+    }
   }
 
   private createInitialStateDelta(profile: CharacterProfile, sequence: number, timestamp: Date) {
