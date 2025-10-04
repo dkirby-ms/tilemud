@@ -124,14 +124,14 @@
 - [X] T063 [P] Add unit tests for metrics service in `server/tests/unit/metricsService.spec.ts` (added coverage for counters, gauges, histogram, reset)
 - [X] T064 [P] Add unit tests for action sequencing edge cases in `server/tests/unit/actionSequenceService.spec.ts` (implemented: coverage for invalid sequences, pending snapshot lifecycle, acknowledgements, and resets)
 - [X] T065 [P] Add unit tests for reconnect service in `server/tests/unit/reconnectService.spec.ts` (implemented: expanded coverage for player mappings, metrics instrumentation, and cleanup paths)
-- [ ] T066 [P] Add unit tests for state delta reducer in `web-client/tests/unit/stateReducer.spec.ts`
-- [ ] T067 Performance test harness for 500 concurrent simulated sessions in `server/tests/integration/load/500-concurrency.spec.ts`
-- [ ] T068 Latency budget verification test (≤200ms p95) instrumentation check in `server/tests/integration/perf/latency-budget.spec.ts`
-- [ ] T069 [P] Documentation: update `specs/005-integrate-the-server/quickstart.md` with any new commands & add `docs/integration-metrics.md`
-- [ ] T070 [P] Documentation: add architectural overview `docs/architecture/realtime-integration.md`
-- [ ] T071 [P] Clean up TODO/FIXME markers and ensure strict TS config passes
-- [ ] T072 Security/PII audit check script in `server/scripts/audit-logging-redaction.ts`
-- [ ] T073 Final pass: remove unused experimental code & ensure bundle size unchanged beyond acceptable delta
+- [X] T066 [P] Add unit tests for state delta reducer in `web-client/tests/unit/stateReducer.spec.ts`
+- [X] T067 Performance test harness for 500 concurrent simulated sessions in `server/tests/integration/load/500-concurrency.spec.ts`
+- [X] T068 Latency budget verification test (≤200ms p95) instrumentation check in `server/tests/integration/perf/latency-budget.spec.ts`
+- [X] T069 [P] Documentation: update `specs/005-integrate-the-server/quickstart.md` with any new commands & add `docs/integration-metrics.md`
+- [X] T070 [P] Documentation: add architectural overview `docs/architecture/realtime-integration.md`
+- [X] T071 [P] Clean up TODO/FIXME markers and ensure strict TS config passes
+- [X] T072 Security/PII audit check script in `server/scripts/audit-logging-redaction.ts`
+- [X] T073 Final pass: remove unused experimental code & ensure bundle size unchanged beyond acceptable delta
 
 ## Dependencies Summary
 - Setup (T001–T007) precedes all tests.
@@ -169,17 +169,17 @@ T063 T064 T065 T066 T069 T070 T071
 ```
 
 ## Validation Checklist (Must hold true before execution continues)
-- [ ] Every listed REST/real-time contract has a failing test before implementation
-- [ ] Each entity has a model task
-- [ ] Tests precede implementation for all features
-- [ ] [P] tasks never share the same target file
-- [ ] All critical NFRs (latency, durability, freshness, availability, security, observability) have explicit test tasks (T019, T017, T068, T074, T075, T085, T078, T077, T081)
-- [ ] Observability tasks present (T057–T060, T063)
-- [ ] Security/PII audit task present (T072)
+- [X] Every listed REST/real-time contract has a failing test before implementation
+- [X] Each entity has a model task
+- [X] Tests precede implementation for all features
+- [X] [P] tasks never share the same target file
+- [X] All critical NFRs (latency, durability, freshness, availability, security, observability) have explicit test tasks (T019, T017, T068, T074, T075, T085, T078, T077, T081)
+- [X] Observability tasks present (T057–T060, T063)
+- [X] Security/PII audit task present (T072)
  
 Progress Update (auto-maintained):
-- Metrics, logging, rate limiting, DB outage guard wiring, Redis health poller, full snapshot signaling, and metrics unit tests (T057–T063) completed.
-- Pending: Remaining polish/unit test/documentation tasks (T064–T073).
+- Metrics, logging, rate limiting, DB outage guard wiring, Redis health poller, full snapshot signaling, and metrics unit tests (T057–T073) completed.
+- All polish, documentation, and audit tasks are now complete; proceed to final validation and integration.
 
 ## Notes
 - Keep commits atomic: one task per commit.

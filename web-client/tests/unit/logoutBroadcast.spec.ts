@@ -18,11 +18,8 @@ describe('Logout Broadcast', () => {
     const { result } = renderHook(() => useLogout(), {
       wrapper: TestAuthWrapper,
     });
-    
     await result.current.logout({ skipConfirmation: true });
-    
-    // TODO: Should write broadcast key with timestamp
-    // Expected: localStorage.setItem('tilemud.logout', JSON.stringify({ ts: <timestamp> }))
+
     expect(setItemSpy).toHaveBeenCalledWith(
       'tilemud.logout',
       expect.stringMatching(/{"ts":".*"}/)
@@ -33,10 +30,8 @@ describe('Logout Broadcast', () => {
     const { result } = renderHook(() => useLogout(), {
       wrapper: TestAuthWrapper,
     });
-    
     await result.current.logout({ skipConfirmation: true });
-    
-    // TODO: Verify ISO timestamp format
+
     const calls = setItemSpy.mock.calls;
     if (calls.length > 0) {
       const broadcastCall = calls.find(call => call[0] === 'tilemud.logout');
@@ -51,11 +46,9 @@ describe('Logout Broadcast', () => {
     const { result } = renderHook(() => useLogout(), {
       wrapper: TestAuthWrapper,
     });
-    
     await result.current.logout({ skipConfirmation: true });
     await result.current.logout({ skipConfirmation: true });
-    
-    // TODO: Should not write duplicate broadcasts for idempotent calls
+
     const broadcastCalls = setItemSpy.mock.calls.filter(call => call[0] === 'tilemud.logout');
     expect(broadcastCalls.length).toBeLessThanOrEqual(1);
   });

@@ -86,6 +86,7 @@ export interface CharacterState {
   selectCharacter: (characterId: string) => Promise<void>;
   refreshAll: () => Promise<void>;
   clearOptimisticCharacter: (tempId: string) => void;
+  clearPlayerError: () => void;
   reset: () => void;
 }
 
@@ -368,6 +369,16 @@ export const useCharacterStore = create<CharacterState>()(
           }));
         },
 
+        clearPlayerError: () => {
+          set((state) => ({
+            ...state,
+            playerLoading: {
+              ...state.playerLoading,
+              error: null
+            }
+          }));
+        },
+
         reset: () => {
           set({
             player: null,
@@ -389,6 +400,7 @@ export const useCharacterStore = create<CharacterState>()(
             selectCharacter: get().selectCharacter,
             refreshAll: get().refreshAll,
             clearOptimisticCharacter: get().clearOptimisticCharacter,
+            clearPlayerError: get().clearPlayerError,
             reset: get().reset
           });
         }

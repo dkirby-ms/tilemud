@@ -4,41 +4,39 @@ import { renderHook } from '@testing-library/react';
 import { TestAuthWrapper } from '../utils/testAuthWrapper';
 
 describe('Logout Idempotency', () => {
-  it('should handle rapid double logout invocation without errors', async () => {
+  it('handles rapid double logout invocation without duplicate side effects', async () => {
     const { result } = renderHook(() => useLogout(), {
       wrapper: TestAuthWrapper,
     });
-    
-    // TODO: This test ensures logout can be called multiple times safely
+
     const logoutFn = result.current.logout;
-    
-    // Mock console.log to verify no duplicate processing
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    
-    // Call logout twice rapidly
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
+
     await Promise.all([
       logoutFn({ skipConfirmation: true }),
       logoutFn({ skipConfirmation: true })
     ]);
-    
-    // Should not throw errors
-    expect(consoleSpy).toHaveBeenCalled();
-    
-    consoleSpy.mockRestore();
+
+    expect(setItemSpy.mock.calls.filter(call => call[0] === 'tilemud.logout').length).toBeLessThanOrEqual(1);
+
+    setItemSpy.mockRestore();
   });
 
-  it('should be a no-op on subsequent calls after first logout', async () => {
+  it('is a no-op on subsequent calls after the first logout', async () => {
     const { result } = renderHook(() => useLogout(), {
       wrapper: TestAuthWrapper,
     });
-    
-    // TODO: Verify subsequent calls are no-ops (FR-06)
+
     const logoutFn = result.current.logout;
-    
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
+
     await logoutFn({ skipConfirmation: true });
+    const callsAfterFirst = setItemSpy.mock.calls.length;
+
     await logoutFn({ skipConfirmation: true });
-    
-    // Test should pass - no exceptions thrown
-    expect(true).toBe(true);
+
+    expect(setItemSpy.mock.calls.length).toBe(callsAfterFirst);
+
+    setItemSpy.mockRestore();
   });
 });

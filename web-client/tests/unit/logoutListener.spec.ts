@@ -1,66 +1,85 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { useLogoutListener } from '../../src/hooks/useLogoutListener';
 
-describe('Logout Listener', () => {
+const resetMock = vi.fn();
+
+vi.mock('../../src/features/character/state/characterStore', () => ({
+  useCharacterStore: () => ({
+    reset: resetMock
+  })
+}));
+
+describe('useLogoutListener', () => {
   let addEventListenerSpy: ReturnType<typeof vi.spyOn>;
   let removeEventListenerSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    resetMock.mockReset();
     addEventListenerSpy = vi.spyOn(window, 'addEventListener');
     removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
+    localStorage.clear();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('should set up storage event listener', () => {
-    renderHook(() => useLogoutListener());
-    
-    expect(addEventListenerSpy).toHaveBeenCalledWith(
-      'storage',
-      expect.any(Function)
-    );
+  it('registers storage and focus listeners on mount', () => {
+    const { unmount } = renderHook(() => useLogoutListener());
+
+    expect(addEventListenerSpy).toHaveBeenCalledWith('storage', expect.any(Function));
+    expect(addEventListenerSpy).toHaveBeenCalledWith('focus', expect.any(Function));
+
+    unmount();
   });
 
-  it('should handle logout broadcast storage events', () => {
-    // TODO: Simulate storage event with logout broadcast
-    const mockStorageEvent = new StorageEvent('storage', {
+  it('ignores unrelated storage events', () => {
+    renderHook(() => useLogoutListener());
+
+    const storageEvent = new StorageEvent('storage', {
+      key: 'unrelated.key',
+      newValue: JSON.stringify({ ts: new Date().toISOString() }),
+      storageArea: localStorage
+    });
+
+    window.dispatchEvent(storageEvent);
+
+    expect(resetMock).not.toHaveBeenCalled();
+  });
+
+  it('purges local state when logout broadcast is received', () => {
+    renderHook(() => useLogoutListener());
+
+    const storageEvent = new StorageEvent('storage', {
       key: 'tilemud.logout',
       newValue: JSON.stringify({ ts: new Date().toISOString() }),
       storageArea: localStorage
     });
 
-    // Dispatch the event
-    window.dispatchEvent(mockStorageEvent);
-    
-    // TODO: Should trigger logout purge in response
-    expect(true).toBe(true); // Placeholder until implemented
+    window.dispatchEvent(storageEvent);
+
+    expect(resetMock).toHaveBeenCalledTimes(1);
   });
 
-  it('should ignore non-logout storage events', () => {
-    // TODO: Test that other localStorage changes are ignored
-    const mockStorageEvent = new StorageEvent('storage', {
-      key: 'other.key',
-      newValue: 'some value',
-      storageArea: localStorage
+  it('checks for logout broadcast on focus events', () => {
+    renderHook(() => useLogoutListener());
+
+    const recentTimestamp = new Date(Date.now() - 10_000).toISOString();
+    localStorage.setItem('tilemud.logout', JSON.stringify({ ts: recentTimestamp }));
+
+    act(() => {
+      window.dispatchEvent(new Event('focus'));
     });
 
-    window.dispatchEvent(mockStorageEvent);
-    
-    // Should not trigger logout behavior
-    expect(true).toBe(true); // Placeholder until implemented
+    expect(resetMock).toHaveBeenCalled();
   });
 
-  it('should clean up listener on unmount', () => {
+  it('removes listeners on unmount', () => {
     const { unmount } = renderHook(() => useLogoutListener());
-    
     unmount();
-    
-    expect(removeEventListenerSpy).toHaveBeenCalledWith(
-      'storage',
-      expect.any(Function)
-    );
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('storage', expect.any(Function));
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('focus', expect.any(Function));
   });
 });

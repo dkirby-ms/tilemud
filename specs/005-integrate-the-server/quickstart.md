@@ -18,11 +18,14 @@
 9. Simulate Redis down (stop container): DEGRADED state surfaced; actions still persisted  
 10. Stop PostgreSQL: attempt action → user-facing pause / UNAVAILABLE message (no ack)  
 11. Wait 10 minutes idle: session terminated; reconnect triggers clean resync  
+12. (Optional) Run the latency budget test suite: `cd server && npx vitest run tests/integration/perf/latency-budget.spec.ts`  
+13. (Optional, heavy) Execute the load harness once implemented: `cd server && npx vitest run tests/integration/load/500-concurrency.spec.ts --run` (remove `.skip` when ready)
 
 ## Expected Outcomes
 - No acknowledged action lost across reconnect or server restart
 - Per-action durability confirmed via ActionEvent row count increments
 - Freshness enforcement: state diff delivered within 100ms window (dev instrumentation)
+- Latency budget checks report p95 ≤ 200ms (see `server/tests/integration/perf/latency-budget.spec.ts`)
 
 ## Verification Commands (Optional)
 ```bash
@@ -31,6 +34,9 @@ psql $DB_URL -c "SELECT COUNT(*) FROM action_events;"
 
 # Tail server logs for version rejects
 grep version_reject server.log | tail -20
+
+# Inspect in-memory metrics snapshot during development
+node -e "import('./dist/infra/metrics.js').then(m => console.log(m.snapshotMetrics()))"
 ```
 
 ## Troubleshooting

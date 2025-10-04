@@ -27,10 +27,8 @@ describe('Focused Dirty Guard', () => {
   it('should return false for clean focused field', () => {
     mockActiveElement.value = '';
     mockActiveElement.defaultValue = '';
-    
     const { result } = renderHook(() => useFocusedDirtyGuard());
-    
-    // TODO: This should check if focused field is dirty and non-empty
+
     expect(result.current.isDirty).toBe(false);
     expect(result.current.shouldConfirm).toBe(false);
   });
@@ -38,10 +36,8 @@ describe('Focused Dirty Guard', () => {
   it('should return true for dirty non-empty focused field', () => {
     mockActiveElement.value = 'test input';
     mockActiveElement.defaultValue = '';
-    
     const { result } = renderHook(() => useFocusedDirtyGuard());
-    
-    // TODO: Should detect dirty field and require confirmation
+
     expect(result.current.isDirty).toBe(true);
     expect(result.current.shouldConfirm).toBe(true);
   });
@@ -49,10 +45,8 @@ describe('Focused Dirty Guard', () => {
   it('should return false for dirty but empty focused field', () => {
     mockActiveElement.value = '';
     mockActiveElement.defaultValue = 'original';
-    
     const { result } = renderHook(() => useFocusedDirtyGuard());
-    
-    // TODO: Empty field should not require confirmation even if dirty
+
     expect(result.current.shouldConfirm).toBe(false);
   });
 

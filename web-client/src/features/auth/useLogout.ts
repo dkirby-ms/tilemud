@@ -46,7 +46,6 @@ export interface LogoutEvent {
   userSurrogateId?: string;
 }
 
-// TODO: Extract MSAL instance from AuthProvider context
 export const useLogout = () => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showSpinner, setShowSpinner] = useState(false);

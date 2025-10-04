@@ -34,6 +34,7 @@ export const CharacterDashboardPage: React.FC<CharacterDashboardPageProps> = ({
     loadServiceHealth,
     createCharacter,
     selectCharacter,
+    clearPlayerError,
   } = useCharacterStore();
 
   const [showCreateForm, setShowCreateForm] = React.useState<boolean>(false);
@@ -138,7 +139,7 @@ export const CharacterDashboardPage: React.FC<CharacterDashboardPageProps> = ({
                 </div>
                 <button 
                   className="error-banner__dismiss"
-                  onClick={() => {/* TODO: Add clear error functionality */}}
+                  onClick={() => clearPlayerError()}
                   aria-label="Dismiss error"
                 >
                   ✕

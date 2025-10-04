@@ -15,7 +15,8 @@
     "seed:ruleset": "node dist/scripts/seed-ruleset.js",
     "purge:messages": "node dist/scripts/purge-private-messages.js",
     "latency:harness": "node dist/scripts/latency-harness.js",
-    "validate:quickstart": "node dist/scripts/validate-quickstart.js"
+    "validate:quickstart": "node dist/scripts/validate-quickstart.js",
+    "audit:logs": "node dist/scripts/audit-logging-redaction.js"
   },
   "dependencies": {
     "@colyseus/schema": "3.0.61",
