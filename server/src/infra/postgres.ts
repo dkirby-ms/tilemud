@@ -1,5 +1,6 @@
-import pg, { Pool } from "pg";
+import pg from "pg";
 import type { PoolClient, Pool as PoolType } from "pg";
+const { Pool } = pg;
 import { getConfig } from "./config.js";
 
 let pool: PoolType | null = null;
