@@ -113,17 +113,17 @@
 - [X] T056 Wire chat input dispatch (intent.chat) in `web-client/src/features/chat/chatController.ts`
 
 ## Phase 3.7: Integration Wiring & Cross-Cutting Concerns
-- [ ] T057 Wire metrics emission where instrumentation points exist (connect, action ack) in existing service & room files
-- [ ] T058 Add structured logging (pino) to session bootstrap, reconnect, action durability flows
-- [ ] T059 Add rate limiting enforcement for chat/movement in `server/src/actions/intentHandlers.ts`
-- [ ] T060 Add Redis health polling + degraded state broadcast scheduler `server/src/infra/redisHealthPoller.ts`
-- [ ] T061 Add DB outage detection pause acknowledgments logic `server/src/services/dbOutageGuard.ts`
-- [ ] T062 Implement sequence gap detection → full snapshot path in `server/src/services/actionSequenceService.ts`
+- [X] T057 Wire metrics emission where instrumentation points exist (connect, action ack) in existing service & room files (implemented via `MetricsService` usage in container, sessionBootstrapService, reconnectService, actionSequenceService, intentHandlers, GameRoom)
+- [X] T058 Add structured logging (pino) to session bootstrap, reconnect, action durability flows (implemented: logger usage present in corresponding service files)
+- [X] T059 Add rate limiting enforcement for chat/movement in `server/src/actions/intentHandlers.ts` (implemented: rate limiter & error handling present)
+- [X] T060 Add Redis health polling + degraded state broadcast scheduler `server/src/infra/redisHealthPoller.ts` (implemented RedisHealthPoller with container startup + unit tests)
+- [X] T061 Add DB outage detection pause acknowledgments logic `server/src/services/dbOutageGuard.ts` (implemented: guard with logging & degraded signal service integration)
+- [X] T062 Implement sequence gap detection → full snapshot path in `server/src/services/actionSequenceService.ts` (implemented snapshot request subscriptions & notifications for gap/missing session handling)
 
 ## Phase 3.8: Polish & Hardening
-- [ ] T063 [P] Add unit tests for metrics service in `server/tests/unit/metricsService.spec.ts`
-- [ ] T064 [P] Add unit tests for action sequencing edge cases in `server/tests/unit/actionSequenceService.spec.ts`
-- [ ] T065 [P] Add unit tests for reconnect service in `server/tests/unit/reconnectService.spec.ts`
+- [X] T063 [P] Add unit tests for metrics service in `server/tests/unit/metricsService.spec.ts` (added coverage for counters, gauges, histogram, reset)
+- [X] T064 [P] Add unit tests for action sequencing edge cases in `server/tests/unit/actionSequenceService.spec.ts` (implemented: coverage for invalid sequences, pending snapshot lifecycle, acknowledgements, and resets)
+- [X] T065 [P] Add unit tests for reconnect service in `server/tests/unit/reconnectService.spec.ts` (implemented: expanded coverage for player mappings, metrics instrumentation, and cleanup paths)
 - [ ] T066 [P] Add unit tests for state delta reducer in `web-client/tests/unit/stateReducer.spec.ts`
 - [ ] T067 Performance test harness for 500 concurrent simulated sessions in `server/tests/integration/load/500-concurrency.spec.ts`
 - [ ] T068 Latency budget verification test (≤200ms p95) instrumentation check in `server/tests/integration/perf/latency-budget.spec.ts`
@@ -176,6 +176,10 @@ T063 T064 T065 T066 T069 T070 T071
 - [ ] All critical NFRs (latency, durability, freshness, availability, security, observability) have explicit test tasks (T019, T017, T068, T074, T075, T085, T078, T077, T081)
 - [ ] Observability tasks present (T057–T060, T063)
 - [ ] Security/PII audit task present (T072)
+ 
+Progress Update (auto-maintained):
+- Metrics, logging, rate limiting, DB outage guard wiring, Redis health poller, full snapshot signaling, and metrics unit tests (T057–T063) completed.
+- Pending: Remaining polish/unit test/documentation tasks (T064–T073).
 
 ## Notes
 - Keep commits atomic: one task per commit.

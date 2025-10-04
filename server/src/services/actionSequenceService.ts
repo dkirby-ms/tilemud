@@ -95,12 +95,16 @@ interface PendingSnapshotEntry {
   scheduledAt: Date;
 }
 
+export type SnapshotRequest = SequenceGapResult | SequenceMissingSessionResult;
+type SnapshotRequestListener = (request: SnapshotRequest) => void;
+
 export class ActionSequenceService {
   private readonly sessions: PlayerSessionStore;
   private readonly metrics?: MetricsService;
   private readonly now: () => Date;
   private readonly pendingSnapshotTtlMs: number;
   private readonly pendingSnapshots = new Map<string, PendingSnapshotEntry>();
+  private readonly snapshotListeners = new Set<SnapshotRequestListener>();
 
   constructor(sessions: PlayerSessionStore, options: ActionSequenceServiceOptions = {}) {
     this.sessions = sessions;
@@ -187,6 +191,13 @@ export class ActionSequenceService {
   hasPendingSnapshot(sessionId: string): boolean {
     this.expireStaleSnapshot(sessionId);
     return this.pendingSnapshots.has(sessionId);
+  }
+
+  subscribeToSnapshotRequests(listener: SnapshotRequestListener): () => void {
+    this.snapshotListeners.add(listener);
+    return () => {
+      this.snapshotListeners.delete(listener);
+    };
   }
 
   private createAcceptResult(
@@ -310,6 +321,8 @@ export class ActionSequenceService {
       result,
       scheduledAt: now
     });
+
+    this.notifySnapshotListeners(result);
   }
 
   private expireStaleSnapshot(sessionId: string): void {
@@ -325,5 +338,15 @@ export class ActionSequenceService {
 
   private isEntryExpired(entry: PendingSnapshotEntry, reference: Date): boolean {
     return reference.getTime() - entry.scheduledAt.getTime() > this.pendingSnapshotTtlMs;
+  }
+
+  private notifySnapshotListeners(result: SnapshotRequest): void {
+    for (const listener of this.snapshotListeners) {
+      try {
+        listener(result);
+      } catch {
+        // Swallow listener errors to avoid interrupting scheduling loop.
+      }
+    }
   }
 }

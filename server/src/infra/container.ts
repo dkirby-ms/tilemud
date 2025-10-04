@@ -27,6 +27,7 @@ import { InactivityTimeoutService } from "../services/inactivityTimeoutService.j
 import type { Pool } from "pg";
 import type { RedisClientType } from "redis";
 import { getAppLogger, type AppLogger } from "../logging/logger.js";
+import { RedisHealthPoller } from "./redisHealthPoller.js";
 
 export interface Container {
   config: AppConfig;
@@ -57,6 +58,7 @@ export interface Container {
   dbOutageGuard: DbOutageGuard;
   versionService: VersionService;
   inactivityTimeoutService: InactivityTimeoutService;
+  redisHealthPoller: RedisHealthPoller;
   logger: AppLogger;
 }
 
@@ -127,6 +129,14 @@ export async function initializeContainer(): Promise<Container> {
     metrics: metricsService,
     logger
   });
+  const redisHealthPoller = new RedisHealthPoller({
+    redis,
+    degradedSignalService,
+    logger,
+    intervalMs: 5_000,
+    timeoutMs: 2_000
+  });
+  redisHealthPoller.start();
 
   container = {
     config,
@@ -157,6 +167,7 @@ export async function initializeContainer(): Promise<Container> {
     dbOutageGuard,
     versionService,
     inactivityTimeoutService,
+    redisHealthPoller,
     logger,
   };
 
@@ -175,6 +186,7 @@ export async function shutdownContainer(): Promise<void> {
     const logger = container.logger ?? console;
     logger.info?.("infra.shutdown.begin");
     container.inactivityTimeoutService.stop();
+    container.redisHealthPoller.stop();
     await Promise.all([
       closePostgres().catch((e) => logger.error?.("infra.postgres.close_failed", e)),
       closeRedis().catch((e) => logger.error?.("infra.redis.close_failed", e)),

@@ -73,6 +73,76 @@ describe("ActionSequenceService", () => {
     expect(service.hasPendingSnapshot("session-1")).toBe(false);
   });
 
+  it("rejects invalid sequences without scheduling snapshots", () => {
+    const sessions = createStoreWithSession(3);
+    const service = new ActionSequenceService(sessions, {
+      metrics: metrics as MetricsService,
+      now
+    });
+
+    const negative = service.evaluate({ sessionId: "session-1", sequence: -1 });
+    expect(negative.status).toBe("invalid");
+    expect(service.hasPendingSnapshot("session-1")).toBe(false);
+
+    const fractional = service.evaluate({ sessionId: "session-1", sequence: 2.5 });
+    expect(fractional.status).toBe("invalid");
+    expect(service.hasPendingSnapshot("session-1")).toBe(false);
+
+    expect(metrics.recordForcedStateRefresh).not.toHaveBeenCalled();
+  });
+
+  it("notifies subscribed listeners when scheduling full snapshot requests", () => {
+    const sessions = createStoreWithSession(2);
+    const service = new ActionSequenceService(sessions, {
+      metrics: metrics as MetricsService,
+      now
+    });
+
+    const requests: Array<{ sessionId: string; status: string; sequence: number }> = [];
+    service.subscribeToSnapshotRequests((request) => {
+      requests.push({ sessionId: request.sessionId, status: request.status, sequence: request.sequence });
+    });
+
+    service.evaluate({ sessionId: "session-1", sequence: 5 });
+    service.evaluate({ sessionId: "session-1", sequence: 5 });
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ sessionId: "session-1", status: "gap", sequence: 5 });
+  });
+
+  it("does not emit duplicate notifications for refreshed scheduling windows", () => {
+    const sessions = createStoreWithSession(2);
+    const service = new ActionSequenceService(sessions, {
+      metrics: metrics as MetricsService,
+      now
+    });
+
+    const requests: number[] = [];
+    service.subscribeToSnapshotRequests((request) => {
+      requests.push(request.sequence);
+    });
+
+    service.evaluate({ sessionId: "session-1", sequence: 5 });
+    service.evaluate({ sessionId: "session-1", sequence: 6 });
+
+    expect(requests).toEqual([5]);
+  });
+
+  it("flags out-of-order sequences without scheduling snapshots", () => {
+    const sessions = createStoreWithSession(5);
+    const service = new ActionSequenceService(sessions, {
+      metrics: metrics as MetricsService,
+      now
+    });
+
+    const evaluation = service.evaluate({ sessionId: "session-1", sequence: 4 });
+
+    expect(evaluation.status).toBe("out_of_order");
+    expect(evaluation.requiresFullResync).toBe(false);
+    expect(service.hasPendingSnapshot("session-1")).toBe(false);
+    expect(metrics.recordForcedStateRefresh).not.toHaveBeenCalled();
+  });
+
   it("expires pending snapshots after configured TTL", () => {
     const sessions = createStoreWithSession(3);
     const service = new ActionSequenceService(sessions, {
@@ -87,5 +157,53 @@ describe("ActionSequenceService", () => {
     timeOffset = 6_000;
     expect(service.hasPendingSnapshot("session-1")).toBe(false);
     expect(metrics.recordForcedStateRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("acknowledge clears pending snapshot state and updates session", () => {
+    const sessions = createStoreWithSession(2);
+    const service = new ActionSequenceService(sessions, {
+      metrics: metrics as MetricsService,
+      now
+    });
+
+    service.evaluate({ sessionId: "session-1", sequence: 6 });
+    expect(service.hasPendingSnapshot("session-1")).toBe(true);
+
+    const acked = service.acknowledge({ sessionId: "session-1", sequence: 6 });
+    expect(acked?.lastSequenceNumber).toBe(6);
+    expect(service.hasPendingSnapshot("session-1")).toBe(false);
+  });
+
+  it("resetSequence normalizes sequences and clears pending snapshots", () => {
+    const sessions = createStoreWithSession(5);
+    const service = new ActionSequenceService(sessions, {
+      metrics: metrics as MetricsService,
+      now
+    });
+
+    service.evaluate({ sessionId: "session-1", sequence: 12 });
+    expect(service.hasPendingSnapshot("session-1")).toBe(true);
+
+    const reset = service.resetSequence("session-1", 3.7);
+    expect(reset?.lastSequenceNumber).toBe(3);
+    expect(service.getLastSequence("session-1")).toBe(3);
+    expect(service.hasPendingSnapshot("session-1")).toBe(false);
+  });
+
+  it("returns null when consuming expired snapshots", () => {
+    const sessions = createStoreWithSession(2);
+    const service = new ActionSequenceService(sessions, {
+      metrics: metrics as MetricsService,
+      now,
+      pendingSnapshotTtlMs: 2_000
+    });
+
+    service.evaluate({ sessionId: "session-1", sequence: 8 });
+    expect(service.hasPendingSnapshot("session-1")).toBe(true);
+
+    timeOffset = 3_000;
+    const consumed = service.consumePendingSnapshot("session-1");
+    expect(consumed).toBeNull();
+    expect(service.hasPendingSnapshot("session-1")).toBe(false);
   });
 });

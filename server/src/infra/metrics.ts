@@ -119,17 +119,20 @@ export function snapshotMetrics(): Record<string, number | { percentile: (p: num
 }
 
 export function resetMetrics(): void {
-  for (const metric of registry.values()) {
+  const entries = Array.from(registry.entries());
+  for (const [name, metric] of entries) {
     if (metric instanceof InMemoryHistogram) {
       metric.reset();
-    } else if (metric instanceof InMemoryCounter || metric instanceof InMemoryGauge) {
-      if ("set" in metric) {
-        metric.set(0);
-      } else if ("inc" in metric) {
-        // Set counters back to zero by recreating them.
-        registry.delete(metric.name);
-        registry.set(metric.name, new InMemoryCounter(metric.name));
-      }
+      continue;
+    }
+
+    if (metric instanceof InMemoryGauge) {
+      metric.set(0);
+      continue;
+    }
+
+    if (metric instanceof InMemoryCounter) {
+      registry.set(name, new InMemoryCounter(name));
     }
   }
 }

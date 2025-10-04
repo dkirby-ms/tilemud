@@ -1,6 +1,8 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import type { RedisClientType } from "redis";
 import { ReconnectService } from "../../src/services/reconnectService.js";
+import type { ReconnectServiceDependencies } from "../../src/services/reconnectService.js";
+import type { MetricsService } from "../../src/services/metricsService.js";
 import type { PlayerReconnectState, ReconnectSession } from "../../src/models/reconnectSession.js";
 import { TileMudError } from "../../src/models/errorCodes.js";
 
@@ -62,13 +64,17 @@ function createMockRedis(clock: () => number): RedisSubset {
   } as RedisSubset;
 }
 
-function createService(clock: () => number): ReconnectService {
+function createService(
+  clock: () => number,
+  overrides: Partial<Omit<ReconnectServiceDependencies, "redis">> = {}
+): ReconnectService {
   const redis = createMockRedis(clock);
   return new ReconnectService({
     redis: redis as unknown as RedisClientType,
     defaultGracePeriodMs: 60_000,
     keyPrefix: "test:",
-    clock
+    clock,
+    ...overrides
   });
 }
 
@@ -210,12 +216,15 @@ describe("ReconnectService", () => {
 
     vi.advanceTimersByTime(2_000);
 
-  const cleaned = await service.cleanupExpiredSessions();
+    const cleaned = await service.cleanupExpiredSessions();
   expect(cleaned).toBeGreaterThanOrEqual(0);
 
     const allSessions = await service.listActiveSessions();
     expect(allSessions).toHaveLength(1);
     expect(allSessions[0].instanceId).toBe("instance-beta");
+
+    const expired = await service.getSession("player-5", "instance-alpha");
+    expect(expired).toBeNull();
   });
 
   it("computes session stats accurately", async () => {
@@ -290,5 +299,67 @@ describe("ReconnectService", () => {
       patch: { lastActionTick: 99 }
     });
     expect(updated).toBe(false);
+  });
+
+  it("persists and fetches player active session mappings", async () => {
+    const clock = () => Date.now();
+    const redis = createMockRedis(clock);
+    const service = new ReconnectService({
+      redis: redis as unknown as RedisClientType,
+      clock,
+      keyPrefix: "mapping:"
+    });
+
+    await service.createSession({
+      playerId: "player-map",
+      instanceId: "instance-map",
+      sessionId: "session-map",
+      playerState: basePlayerState
+    });
+
+    const mapping = await service.getPlayerActiveSession("player-map");
+    expect(mapping).toEqual({ instanceId: "instance-map", sessionId: "session-map" });
+
+    await service.removeSession("player-map", "instance-map");
+    const afterRemoval = await service.getPlayerActiveSession("player-map");
+    expect(afterRemoval).toBeNull();
+  });
+
+  it("records reconnect metrics for success and failure paths", async () => {
+    const metrics = {
+      recordReconnectAttempt: vi.fn(),
+      recordReconnectSuccess: vi.fn()
+    };
+
+    const service = createService(() => Date.now(), {
+      metrics: metrics as unknown as MetricsService
+    });
+
+    await expect(
+      service.attemptReconnect({
+        playerId: "missing-player",
+        instanceId: "missing-instance",
+        newSessionId: "session-new"
+      })
+    ).rejects.toBeInstanceOf(TileMudError);
+
+    expect(metrics.recordReconnectAttempt).toHaveBeenCalledTimes(1);
+    expect(metrics.recordReconnectSuccess).not.toHaveBeenCalled();
+
+    await service.createSession({
+      playerId: "player-metrics",
+      instanceId: "instance-metrics",
+      sessionId: "session-start",
+      playerState: basePlayerState
+    });
+
+    await service.attemptReconnect({
+      playerId: "player-metrics",
+      instanceId: "instance-metrics",
+      newSessionId: "session-next"
+    });
+
+    expect(metrics.recordReconnectAttempt).toHaveBeenCalledTimes(2);
+    expect(metrics.recordReconnectSuccess).toHaveBeenCalledTimes(1);
   });
 });
